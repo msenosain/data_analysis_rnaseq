@@ -92,6 +92,35 @@ p_all$Vantage_ID = paste0('R',gsub('-', '_', p_all$Vantage_ID))
 colnames(rna_all)[8:ncol(rna_all)] = p_all$Vantage_ID
 
 
+# Matching with  CDE
+CDE_TMA36 <- read.csv(file = '/Users/senosam/Documents/Massion_lab/CyTOF_summary/CDE_TMA36_2020FEB25_SA.csv')
+x <- match(p_all$pt_ID, CDE_TMA36$pt_ID) # Select only pts with RNA Seq data
+pData_rnaseq <- CDE_TMA36[x,]
+
+
+# Normalizing by gene length (TPM)
+tpm <- function(counts, lengths) {
+  x <- counts / lengths
+  tpm.mat <- t( t(x) * 1e6 / colSums(x) )
+  tpm.mat
+}
+
+
+tpm_all <- tpm(rna_all[,8:ncol(rna_all)], rna_all$Feature_length)
+tpm_all_cbs <- cbind('sample_ID' = rna_all$Feature_gene_name, data.frame(tpm_all))
+rownames(tpm_all) <- rna_all$Feature_gene_name
+
+write.table(tpm_all_cbs, file = "rnaseq_tpm_cbs.txt", sep = "\t",
+            row.names = FALSE, quote = FALSE)
+write.table(tpm_all, file = "rnaseq_tpm.txt", sep = "\t",
+            row.names = TRUE, quote = FALSE)
+
+save(rna_all, p_all, pData_rnaseq, tpm_all, file = 'rnaseq.RData')
+
+
+
+
+
 
 
 
