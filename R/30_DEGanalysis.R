@@ -13,6 +13,13 @@ sdv <- apply(rna_all[, 8:ncol(rna_all)], 1, sd)
 q1 <- quantile(variances, na.rm = T)["25%"]
 idx <- which(is.na(variances) | variances <= q1 | sdv == 0)
 rna_all <- rna_all[-idx, ]
+result <- WGCNA::collapseRows(rna_all[, 8:ncol(rna_all)],
+                          rowGroup=rna_all$Feature_gene_name,
+                          rowID=rownames(rna_all),
+                          method="function",
+                          methodFunction=colMeans)
+counts_all <- round(data.frame(result$datETcollapsed), digits = 0)
+
 
 # 2. Use normalized counts batch corrected samples to find high normal and low expression of gene X
 log2fpkm <- cbind(fpkm_all[,1:7], log(fpkm_all[,8:ncol(fpkm_all)] + 1, base = 2))
@@ -29,14 +36,14 @@ plot(pca_rna$x, col=p_all$Batch, pch=19)
 legend(150, -50 , legend = c("Batch 1", "Batch 2"), pch = 19, col=c("black", "red")) 
 
 ## Collapse duplicated genes
-result <- WGCNA::collapseRows(combat_edata1,
+result2 <- WGCNA::collapseRows(combat_edata1,
                           rowGroup=log2fpkm$Feature_gene_name,
                           rowID=rownames(combat_edata1),
                           method="function",
                           methodFunction=colMeans)
 
 # 3. Label samples high normal and low for gene of interest
-data <- data.frame(result$datETcollapsed) 
+data <- data.frame(result2$datETcollapsed) 
 
 ## label low and high SLC7A11
 data_t <- data.frame(t(data))
@@ -53,19 +60,26 @@ meta_data <- data_t %>%
   filter(level != "normal") %>%
   as.data.frame()
 low_high_patients <- meta_data$patient
-count_data <- as.data.frame(rna_all[,low_high_patients])\
+count_data <- as.data.frame(counts_all[,low_high_patients])
 
 
 # 4. DGE analysis
 
+k <- which(meta_data$batch == 1)
+meta_data$batch[k] = 'A'
+meta_data$batch[-k] = 'B'
+meta_data$batch <- factor(meta_data$batch)
+meta_data$level <- factor(meta_data$level)
 differential_expression_matrix <- DESeqDataSetFromMatrix(
   countData = count_data,
   colData = meta_data,
   design = ~batch + level, tidy = F  
 )
+
 differential_expression_matrix$level <- relevel(differential_expression_matrix$level, ref = "low")
 differential_expression_analysis <- DESeq(differential_expression_matrix, parallel = F)
-differential_expression_result_level <- as_tibble(results(differential_expression_analysis, tidy = T)) %>%
+
+differential_expression_result_level <- as_tibble(results(differential_expression_analysis)) %>%
   filter(padj < 0.001) %>%
   dplyr::rename(gene = row) %>%
   # arrange(desc(log2FoldChange))
