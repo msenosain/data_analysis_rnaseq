@@ -108,3 +108,33 @@ result <- WGCNA::collapseRows(combat_edata1,
                           methodFunction=colMeans)
 
 data <- data.frame(result$datETcollapsed) #use this for undupervised analysis
+variances <- apply(data, 1, var)
+sdv <- apply(data, 1, sd)
+
+
+top_unsup <- data.frame(data) %>%
+  mutate(gene =rownames(.),
+    sdv = sdv,
+    variances = variances) %>%
+  arrange(desc(variances)) %>%
+  select(gene) %>%
+  head(100) %>%
+  pull()
+
+filtered_data <- data.frame(data) %>%
+  mutate(gene =rownames(.)) %>%
+  filter(gene %in% top_unsup) %>%
+  select(.,gene, everything())
+
+rownames(filtered_data) <- filtered_data$gene
+
+heatmap(as.matrix(filtered_data[,2:ncol(filtered_data)]), scale='row')
+
+
+cormat <- Hmisc::rcorr(t(as.matrix(filtered_data[,2:ncol(filtered_data)])))
+
+heatmap(cormat$r)
+
+# try removing unsignificant p vals from matrix
+
+
