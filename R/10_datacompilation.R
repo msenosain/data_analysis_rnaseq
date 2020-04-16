@@ -51,8 +51,8 @@ p_3388YZ['Batch'] = 1
 rna_3388YZ$Feature_gene_name1 <- NULL
 fpkm_3388YZ$Feature_gene_name1 <- NULL
 
-p_3388YZ[37, 2] <- 14301
-p_3388YZ[56, 2] <- 8356
+p_3388YZ[37, 2] <- '14301'
+p_3388YZ[56, 2] <- '8356'
 
 
 # Second Batch
@@ -134,7 +134,13 @@ tpm_all <- tpm(rna_all[,8:ncol(rna_all)], rna_all$Feature_length)
 tpm_all_cbs <- cbind('sample_ID' = rna_all$Feature_gene_name, data.frame(tpm_all))
 rownames(tpm_all) <- rna_all$Feature_gene_name
 
-save(rna_all, fpkm_all, tpm_all, tpm_all_cbs, p_all, pData_rnaseq, file = 'rnaseq.RData')
+fpkm_dcv <- as.matrix(fpkm_all[,8:ncol(fpkm_all)])
+fpkm_dcv_cbs <- cbind('sample_ID' = fpkm_all$Feature_gene_name, data.frame(fpkm_dcv))
+rownames(fpkm_dcv) <- fpkm_all$Feature_gene_name
+
+
+
+save(rna_all, fpkm_all, fpkm_dcv, fpkm_dcv_cbs, tpm_all, tpm_all_cbs, p_all, pData_rnaseq, file = 'rnaseq.RData')
 
 
 
