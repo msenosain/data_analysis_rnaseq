@@ -49,6 +49,23 @@ result <- WGCNA::collapseRows(rna_all[, 8:ncol(rna_all)],
 counts_all <- round(data.frame(result$datETcollapsed), digits = 0)
 
 # Normalize
+p_all$Batch <- as.factor(p_all$Batch)
+dds <- DESeqDataSetFromMatrix(
+  countData = counts_all,
+  colData = p_all,
+  design = ~Batch, tidy = F  
+)
+dds <- estimateSizeFactors(dds)
+sizeFactors(dds)
+#normalized_counts <- counts(dds, normalized=TRUE)
+vsd <- vst(dds)
+
+# Remove batch effect
+plotPCA(vsd, "Batch")
+assay(vsd) <- limma::removeBatchEffect(assay(vsd), vsd$Batch)
+plotPCA(vsd, "Batch")
+vsd_mat <- assay(vsd)
+
 log2fpkm <- cbind(fpkm_all[,1:7], log(fpkm_all[,8:ncol(fpkm_all)] + 1, base = 2))
 log2fpkm <- log2fpkm[-idx, ]
 result <- WGCNA::collapseRows(log2fpkm[, 8:ncol(log2fpkm)],
@@ -58,7 +75,7 @@ result <- WGCNA::collapseRows(log2fpkm[, 8:ncol(log2fpkm)],
                           methodFunction=colMeans)
 log2fpkm <- data.frame(result$datETcollapsed)
 
-# Remove batch effect
+
 combat_log2fpkm = sva::ComBat(dat=as.matrix(log2fpkm), batch=p_all$Batch, mod=NULL, par.prior=TRUE, prior.plots=FALSE)
 
 ## Batches by PCA
@@ -78,19 +95,19 @@ load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/dge_preprocessed.RData
 label_by_gene <- function(normalized_data, gene, metadata, extremes_only=FALSE){
     if(extremes_only){
         data_t <- data.frame(t(normalized_data))
-        mid_q <- quantile(data_t[,gene])[["50%"]]
-        data_t$level <- "low"
-        data_t$level[data_t[,gene]  > mid_q] <- "high"
-        data_t$patient <- rownames(data_t)
-        data_t$batch <- metadata$Batch
-
-    } else {
-        data_t <- data.frame(t(normalized_data))
         first_q <- quantile(data_t[,gene])[["25%"]]
         third_q <- quantile(data_t[,gene])[["75%"]]
         data_t$level <- "normal"
         data_t$level[data_t[,gene] < first_q] <- "low"
         data_t$level[data_t[,gene] > third_q] <- "high"
+        data_t$patient <- rownames(data_t)
+        data_t$batch <- metadata$Batch
+
+    } else {
+        data_t <- data.frame(t(normalized_data))
+        mid_q <- quantile(data_t[,gene])[["50%"]]
+        data_t$level <- "low"
+        data_t$level[data_t[,gene]  > mid_q] <- "high"
         data_t$patient <- rownames(data_t)
         data_t$batch <- metadata$Batch
     }
@@ -104,6 +121,8 @@ label_by_gene <- function(normalized_data, gene, metadata, extremes_only=FALSE){
     meta_data
 }
 
+# For SLC7A11
+meta_data <- label_by_gene(combat_log2fpkm, gene='SLC7A11', p_all, extremes_only=F)
 
 differential_expression_matrix <- DESeqDataSetFromMatrix(
   countData = counts_all,
@@ -117,10 +136,30 @@ results(differential_expression_analysis)
 
 differential_expression_result_level <- data.frame(results(differential_expression_analysis)) %>%
   mutate(gene=rownames(.))  %>%
-  filter(padj < 0.001) %>%
+  #filter(padj < 0.001) %>%
   #dplyr::rename(gene = row) %>%
   arrange(desc(log2FoldChange))
   #arrange(padj)
+
+top <- differential_expression_result_level %>%
+  head(200) %>%
+  dplyr::select(gene) %>%
+  pull()
+
+dh_genes <- DH_gene_list$Feature_gene_name
+
+# Use normalized batch corrected collapsed data for plot
+
+filtered_SLC7A11 <- data.frame(combat_log2fpkm) %>%
+  mutate(gene=rownames(.)) %>%
+  filter(gene %in% dh_genes) %>%
+  #select(gene, all_of(low_high_patients)) %>%
+  as.data.frame()
+rownames(filtered_SLC7A11) <- filtered_SLC7A11$gene
+filtered_SLC7A11$gene <- NULL
+colors <- c("red", "blue")
+#levels <- as.factor(data_t %>% filter(level != "normal") %>% dplyr::select(level) %>% pull())
+heatmap(as.matrix(filtered_SLC7A11), ColSideColors = colors[meta_data$level])
 
 
 
