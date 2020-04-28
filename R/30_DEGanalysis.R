@@ -6,18 +6,6 @@ library(DESeq2)
 library(sva)
 # Check BiocManager::valid()
 
-# 0. Input: raw counts and fpkm
-# 1. Pre-process:
-#    - Remove duplicates (both), 
-#    - Normalize and remove batch effect (fpkm)
-# 2. Label samples: 
-#    A. gene low/ high
-#    B. clinical var
-# 3. DEG
-
-
-
-
 # Load data
 load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData")
 
@@ -79,70 +67,77 @@ label_by_gene <- function(normalized_data, gene, metadata, extremes_only=FALSE){
         data_t$level <- "normal"
         data_t$level[data_t[,gene] < first_q] <- "low"
         data_t$level[data_t[,gene] > third_q] <- "high"
-        data_t$patient <- rownames(data_t)
-        data_t$batch <- metadata$Batch
 
     } else {
         data_t <- data.frame(t(normalized_data))
         mid_q <- quantile(data_t[,gene])[["50%"]]
         data_t$level <- "low"
         data_t$level[data_t[,gene]  > mid_q] <- "high"
-        data_t$patient <- rownames(data_t)
-        data_t$batch <- metadata$Batch
+
     }
 
-    meta_data <- data_t %>%
-      select(patient, level, batch) %>%
-      as.data.frame()
-    meta_data$batch <- factor(meta_data$batch)
+    meta_data <- cbind(metadata, level=data_t$level)
+    meta_data$Batch <- factor(meta_data$Batch)
     meta_data$level <- factor(meta_data$level)
 
     meta_data
 }
 
 # For SLC7A11
-meta_data <- label_by_gene(vsd_mat, gene='SLC7A11', p_all, extremes_only=F)
+gene_x <- 'KDM5D'
+meta_data <- label_by_gene(vsd_mat, gene=gene_x, p_all, extremes_only=T)
+meta_data <- meta_data %>% filter(level != "normal")
+counts_all <- as.data.frame(counts_all[,meta_data$Vantage_ID])
+pData_rnaseq <- pData_rnaseq %>% filter(pt_ID %in% meta_data$pt_ID)
+vsd_mat <- vsd_mat[,meta_data$Vantage_ID]
 
 dds <- DESeqDataSetFromMatrix(
   countData = counts_all,
   colData = meta_data,
-  design = ~batch + level, tidy = F  
+  design = ~Batch + level, tidy = F  
 )
 
 dds$level <- relevel(dds$level, ref = "low")
 dds_deg <- DESeq(dds, parallel = F)
-results(dds_deg)
 
 dds_level <- data.frame(results(dds_deg)) %>%
   mutate(gene=rownames(.))  %>%
-  #filter(padj < 0.001) %>%
+  filter(padj < 0.001) %>%
   #dplyr::rename(gene = row) %>%
   arrange(desc(log2FoldChange))
   #arrange(padj)
 
 top <- dds_level %>%
-  head(200) %>%
+  head(100) %>%
   dplyr::select(gene) %>%
   pull()
 
-DH_gene_list <- read_excel("~/Downloads/DH_gene_list.xlsx")
-dh_genes <- DH_gene_list$Feature_gene_name
+#DH_gene_list <- read_excel("~/Downloads/DH_gene_list.xlsx")
+#dh_genes <- DH_gene_list$Feature_gene_name
 
-
+gene_list <- top
 # Use normalized batch corrected collapsed data (vsd_mat) for plot
-filtered_SLC7A11 <- data.frame(vsd_mat) %>%
+filtered_res <- data.frame(vsd_mat) %>%
   mutate(gene=rownames(.)) %>%
-  filter(gene %in% top) %>%
+  filter(gene %in% gene_list) %>%
   #select(gene, all_of(low_high_patients)) %>%
   as.data.frame()
-rownames(filtered_SLC7A11) <- filtered_SLC7A11$gene
-filtered_SLC7A11$gene <- NULL
-colors <- c("red", "blue")
-#levels <- as.factor(data_t %>% filter(level != "normal") %>% dplyr::select(level) %>% pull())
-heatmap(as.matrix(filtered_SLC7A11), ColSideColors = colors[meta_data$level])
+rownames(filtered_res) <- filtered_res$gene
+filtered_res$gene <- NULL
 
+# Plot
 
+library(ComplexHeatmap)
+ha = HeatmapAnnotation(
 
+    CANARY = as.factor(pData_rnaseq$CANARY),
+    KDM5D_level = as.factor(meta_data$level),
 
+    simple_anno_size = unit(0.5, "cm")
+)
 
-
+    Heatmap(as.matrix(filtered_res), name = "mat", row_km = 2,
+      heatmap_legend_param = list(color_bar = "continuous"), 
+      row_names_gp = gpar(fontsize = 8),
+      column_names_gp = gpar(fontsize = 8), top_annotation = ha, 
+      column_split =as.factor(meta_data$level))
