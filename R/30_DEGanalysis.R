@@ -4,6 +4,8 @@ library(tidyr)
 library(stringr)
 library(DESeq2)
 library(sva)
+library(limma)
+library(ComplexHeatmap)
 # Check BiocManager::valid()
 
 # Load data
@@ -37,10 +39,11 @@ counts_all <- round(data.frame(result$datETcollapsed), digits = 0)
 
 # Normalize
 p_all$Batch <- as.factor(p_all$Batch)
+p_all$Gender <- pData_rnaseq$Gender
 dds <- DESeqDataSetFromMatrix(
   countData = counts_all,
   colData = p_all,
-  design = ~Batch, tidy = F  
+  design = ~Batch + Gender, tidy = F  
 )
 dds <- estimateSizeFactors(dds)
 sizeFactors(dds)
@@ -48,9 +51,14 @@ sizeFactors(dds)
 vsd <- vst(dds)
 
 # Remove batch effect
+plotPCA(vsd, "Gender")
 plotPCA(vsd, "Batch")
 assay(vsd) <- limma::removeBatchEffect(assay(vsd), vsd$Batch)
 plotPCA(vsd, "Batch")
+plotPCA(vsd, "Gender")
+assay(vsd) <- limma::removeBatchEffect(assay(vsd), vsd$Gender)
+plotPCA(vsd, "Batch")
+plotPCA(vsd, "Gender")
 vsd_mat <- assay(vsd)
 
 # Save pre-processed data
@@ -78,6 +86,7 @@ label_by_gene <- function(normalized_data, gene, metadata, extremes_only=FALSE){
 
     meta_data <- cbind(metadata, level=data_t$level)
     meta_data$Batch <- factor(meta_data$Batch)
+    meta_data$Gender <- factor(meta_data$Gender)
     meta_data$level <- factor(meta_data$level)
 
     meta_data
@@ -94,7 +103,7 @@ vsd_mat <- vsd_mat[,meta_data$Vantage_ID]
 dds <- DESeqDataSetFromMatrix(
   countData = counts_all,
   colData = meta_data,
-  design = ~Batch + level, tidy = F  
+  design = ~Batch + Gender + level, tidy = F  
 )
 
 dds$level <- relevel(dds$level, ref = "low")
@@ -127,10 +136,11 @@ filtered_res$gene <- NULL
 
 # Plot
 
-library(ComplexHeatmap)
+
 ha = HeatmapAnnotation(
 
     CANARY = as.factor(pData_rnaseq$CANARY),
+    gender = as.factor(pData_rnaseq$Gender),
     KDM5D_level = as.factor(meta_data$level),
 
     simple_anno_size = unit(0.5, "cm")
