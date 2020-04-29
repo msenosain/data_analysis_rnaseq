@@ -93,7 +93,7 @@ label_by_gene <- function(normalized_data, gene, metadata, extremes_only=FALSE){
 }
 
 # For SLC7A11
-gene_x <- 'KDM5D'
+gene_x <- 'SLC7A11'
 meta_data <- label_by_gene(vsd_mat, gene=gene_x, p_all, extremes_only=T)
 meta_data <- meta_data %>% filter(level != "normal")
 counts_all <- as.data.frame(counts_all[,meta_data$Vantage_ID])
@@ -117,12 +117,12 @@ dds_level <- data.frame(results(dds_deg)) %>%
   #arrange(padj)
 
 top <- dds_level %>%
-  head(100) %>%
+  head(50) %>%
   dplyr::select(gene) %>%
   pull()
 
-#DH_gene_list <- read_excel("~/Downloads/DH_gene_list.xlsx")
-#dh_genes <- DH_gene_list$Feature_gene_name
+DH_gene_list <- readxl::read_excel("~/Downloads/DH_gene_list.xlsx")
+dh_genes <- DH_gene_list$Feature_gene_name
 
 gene_list <- top
 # Use normalized batch corrected collapsed data (vsd_mat) for plot
@@ -141,13 +141,17 @@ ha = HeatmapAnnotation(
 
     CANARY = as.factor(pData_rnaseq$CANARY),
     gender = as.factor(pData_rnaseq$Gender),
-    KDM5D_level = as.factor(meta_data$level),
+    SLC7A11_level = as.factor(meta_data$level),
 
     simple_anno_size = unit(0.5, "cm")
 )
 
-    Heatmap(as.matrix(filtered_res), name = "mat", row_km = 2,
-      heatmap_legend_param = list(color_bar = "continuous"), 
-      row_names_gp = gpar(fontsize = 8),
-      column_names_gp = gpar(fontsize = 8), top_annotation = ha, 
-      column_split =as.factor(meta_data$level))
+Heatmap(as.matrix(filtered_res), name = "mat", #column_km = 2, #row_km = 2,
+  #column_split =as.factor(pData_rnaseq$CANARY),
+  column_split =as.factor(meta_data$level),
+  heatmap_legend_param = list(color_bar = "continuous"), 
+  row_names_gp = gpar(fontsize = 8),
+  column_names_gp = gpar(fontsize = 8), top_annotation = ha)
+
+
+# Pathway analysis
