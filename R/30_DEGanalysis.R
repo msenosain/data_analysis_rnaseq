@@ -143,8 +143,8 @@ DE_analysis <- function(ls_preprocessed,
     }
 
     if(NewCondition){
-        meta_data <- NewCondition_df %>% filter(cond_nm %in% two_levels)
         names(meta_data)[names(meta_data) == cond_nm] <- 'Condition'
+        meta_data <- NewCondition_df %>% filter(cond_nm %in% two_levels)
     }
 
     message('Labeling done')
@@ -211,6 +211,54 @@ DE_analysis <- function(ls_preprocessed,
 
 
 
+
+
+top <- dds_level %>%
+  head(50) %>%
+  dplyr::select(gene) %>%
+  pull()
+
+
+EnhancedVolcano(dds_level,
+    lab = rownames(dds_level),
+    x = 'log2FoldChange',
+    y = 'pvalue',
+    xlim = c(-5,5),
+    title = 'Plot')
+
+
+#DH_gene_list <- readxl::read_excel("~/Downloads/DH_gene_list.xlsx")
+#dh_genes <- DH_gene_list$Feature_gene_name
+
+gene_list <- top
+
+# Use normalized data (vsd_mat) for plot
+filtered_res <- data.frame(vsd_mat) %>%
+  mutate(gene=rownames(.)) %>%
+  filter(gene %in% gene_list) %>%
+  #select(gene, all_of(low_high_patients)) %>%
+  as.data.frame()
+rownames(filtered_res) <- filtered_res$gene
+filtered_res$gene <- NULL
+
+# Plot
+ha = HeatmapAnnotation(
+
+    CANARY = as.factor(pData_rnaseq$CANARY),
+    gender = as.factor(pData_rnaseq$Gender),
+    SLC7A11_level = as.factor(meta_data$level),
+
+    simple_anno_size = unit(0.5, "cm")
+)
+
+Heatmap(as.matrix(filtered_res), name = "mat", 
+    #column_km = 2, 
+    #row_km = 5,
+  #column_split =as.factor(pData_rnaseq$CANARY),
+  column_split =as.factor(meta_data$level),
+  heatmap_legend_param = list(color_bar = "continuous"), 
+  row_names_gp = gpar(fontsize = 8),
+  column_names_gp = gpar(fontsize = 8), top_annotation = ha)
 
 
 
