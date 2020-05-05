@@ -210,59 +210,106 @@ DE_analysis <- function(ls_preprocessed,
 }
 
 
+fgsea_analysis <- function(DE_res){
+
+    # Unlist
+    res_df=DE_res$res_df
+
+    ranks <- res_df %>%
+      select(symbol,stat) %>%
+      na.omit() %>% 
+      distinct() %>% 
+      group_by(symbol) %>% 
+      summarize(stat=mean(stat))
+
+    ranks <- deframe(ranks)
+
+    hallmark_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/h.all.v7.1.symbols.gmt'
+    c1_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/c1.all.v7.1.symbols.gmt'
+    c2_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/c2.all.v7.1.symbols.gmt'
+    c3_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/c3.all.v7.1.symbols.gmt'
+    c4_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/c4.all.v7.1.symbols.gmt'
+    c5_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/c5.all.v7.1.symbols.gmt'
+    c6_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/c6.all.v7.1.symbols.gmt'
+    c7_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/c7.all.v7.1.symbols.gmt'
+    msig_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/msigdb.v7.1.symbols.gmt'
+
+    fgsea_fixed <- function(pthw_path){
+        res <- fgsea(pathways=gmtPathways(pthw_path), stats=ranks, nperm=1000) %>%
+                    as_tibble %>%
+                    arrange(padj, desc(NES))
+        res$state <- ifelse(res$NES > 0, "up", "down")
+        res$leadingEdge <- sapply(res$leadingEdge, . %>% {
+          str_c(., collapse = " ")})
+
+        res
+    }
+
+    res_hm <- fgsea_fixed(pthw_path=hallmark_path)
+    res_c1 <- fgsea_fixed(pthw_path=c1_path)
+    res_c2 <- fgsea_fixed(pthw_path=c2_path)
+    res_c3 <- fgsea_fixed(pthw_path=c3_path)
+    res_c4 <- fgsea_fixed(pthw_path=c4_path)
+    res_c5 <- fgsea_fixed(pthw_path=c5_path)
+    res_c6 <- fgsea_fixed(pthw_path=c6_path)
+    res_c7 <- fgsea_fixed(pthw_path=c7_path)
+    res_msg <- fgsea_fixed(pthw_path=msig_path)
+
+    fgsea_res <- list(res_hm=res_hm, res_c1=res_c1, res_c2=res_c2, 
+        res_c3=res_c3, res_c4=res_c4, res_c5=res_c5, res_c6=res_c6,
+        res_c7=res_c7, res_msg=res_msg)
+
+    fgsea_res
+
+}
+
+# plots
+
+heatmap <- function()
+
+volcano <- function()
+
+fgsea_plot <- function(fgsea_res, 
+        pathways_title, 
+        cutoff = 0.05, 
+        max_pathways = 30, 
+        xlabel = "Pathway", 
+        ylabel = "Normalized Enrichment Score", 
+        condition_name){
+
+    color_levels <- function(fgsea_res) {
+        colors <- c()
+        if (any(fgsea_res$state == "down")) {
+          colors <- c(colors, "lightblue")
+        }
+        if (any(fgsea_res$state == "up")) {
+          colors <- c(colors, "#DC143C")
+        }
+        colors
+    }
 
 
+    curated_pathways <- fgsea_res %>%
+        dplyr::slice(1:max_pathways)
+    if (!is.null(cutoff)) {
+        curated_pathways %<>% filter(padj < cutoff)
+    }
 
-top <- dds_level %>%
-  head(50) %>%
-  dplyr::select(gene) %>%
-  pull()
+    print(ggplot(curated_pathways, aes(reorder(pathway, NES), NES)) +
+        geom_col(aes(fill = state), width = 0.5, color = "black") +
+        scale_size_manual(values = c(0, 1), guide = "none") +
+        geom_label(aes(label = round(padj, 4)), size = 3) +
+        coord_flip() +
+        labs(
+            x = 'Pathway', 
+            y = "Normalized Enrichment Score",
+            title = str_c(pathways_title, " pathways: ", condition_name),
+            subtitle = str_c("(Cutoff: p.adj <", cutoff, ")")
+        ) +
+        theme_bw() +
+        scale_fill_manual(values = color_levels(curated_pathways)))
 
-
-EnhancedVolcano(dds_level,
-    lab = rownames(dds_level),
-    x = 'log2FoldChange',
-    y = 'pvalue',
-    xlim = c(-5,5),
-    title = 'Plot')
-
-
-#DH_gene_list <- readxl::read_excel("~/Downloads/DH_gene_list.xlsx")
-#dh_genes <- DH_gene_list$Feature_gene_name
-
-gene_list <- top
-
-# Use normalized data (vsd_mat) for plot
-filtered_res <- data.frame(vsd_mat) %>%
-  mutate(gene=rownames(.)) %>%
-  filter(gene %in% gene_list) %>%
-  #select(gene, all_of(low_high_patients)) %>%
-  as.data.frame()
-rownames(filtered_res) <- filtered_res$gene
-filtered_res$gene <- NULL
-
-# Plot
-ha = HeatmapAnnotation(
-
-    CANARY = as.factor(pData_rnaseq$CANARY),
-    gender = as.factor(pData_rnaseq$Gender),
-    SLC7A11_level = as.factor(meta_data$level),
-
-    simple_anno_size = unit(0.5, "cm")
-)
-
-Heatmap(as.matrix(filtered_res), name = "mat", 
-    #column_km = 2, 
-    #row_km = 5,
-  #column_split =as.factor(pData_rnaseq$CANARY),
-  column_split =as.factor(meta_data$level),
-  heatmap_legend_param = list(color_bar = "continuous"), 
-  row_names_gp = gpar(fontsize = 8),
-  column_names_gp = gpar(fontsize = 8), top_annotation = ha)
-
-
-
-
+}
 
 
 
@@ -284,6 +331,10 @@ DE_res2 <- DE_analysis(ls_preprocessed,
     two_levels=c('P','G'),
     reference = 'G', # low, alive
     correct_gender=FALSE)
+
+fgsea_res <- fgsea_analysis(DE_res2)
+fgsea_plot(fgsea_res$res_c6, pathways_title='Hallmark', condition_name='G vs P')
+
 
 
 # Load data
