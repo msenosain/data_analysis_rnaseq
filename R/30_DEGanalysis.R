@@ -31,7 +31,7 @@ preprocess_rna <- function(path_rnaseq,
     unique_vntg <- p_all %>%
       filter(., !(pt_ID %in% dupl &
         grepl("R4163",Vantage_ID))) %>%
-      select(., Vantage_ID) %>%
+      dplyr::select(., Vantage_ID) %>%
       pull()
 
     p_all <- p_all[which(p_all$Vantage_ID %in% unique_vntg),]
