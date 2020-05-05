@@ -107,15 +107,13 @@ label_by_gene <- function(normalized_data, gene, metadata, extremes_only=FALSE){
 }
 
 DE_analysis <- function(ls_preprocessed, 
-    Unsupervised=TRUE, 
-    GeneBased=FALSE, 
+    GeneBased=TRUE, 
     pDataBased=FALSE,
     NewCondition=FALSE,
-    condition, # gene or column name
     NewCondition_df, # condition label into p_all
-    two_states, # high low, dead alive...
+    cond_nm, # gene or column name
+    two_levels=c('high','low'), # high low, dead alive...
     reference, # low, alive
-    clustering,
     correct_gender=FALSE,
     extremes_only=TRUE
     ){
@@ -127,52 +125,70 @@ DE_analysis <- function(ls_preprocessed,
     counts_all=ls_preprocessed$counts_all
     vsd_mat=ls_preprocessed$vsd_mat
 
-    if(Unsupervised){
+    message('Unlist done')
 
-    }
 
     if(GeneBased){
-        meta_data <- label_by_gene(vsd_mat, gene=condition, p_all, extremes_only=T)
-        meta_data <- meta_data %>% filter(level != "normal")
-        counts_all <- as.data.frame(counts_all[,meta_data$Vantage_ID])
-        pData_rnaseq <- pData_rnaseq %>% filter(pt_ID %in% meta_data$pt_ID)
-        vsd_mat <- vsd_mat[,meta_data$Vantage_ID]
+        meta_data <- label_by_gene(vsd_mat, gene=cond_nm, p_all, extremes_only=extremes_only)
+        meta_data <- meta_data %>% filter(Condition != "normal")
     }
     
     if(pDataBased){
-
+        meta_data <- pData_rnaseq %>% select(pt_ID, all_of(cond_nm))
+        meta_data$pt_ID <- as.character(meta_data$pt_ID)
+        p_all$pt_ID <- as.character(p_all$pt_ID)
+        meta_data <- inner_join(p_all, meta_data, by='pt_ID')
+        names(meta_data)[names(meta_data) == cond_nm] <- 'Condition'
+        meta_data <- meta_data %>% filter(Condition %in% two_levels)
     }
 
     if(NewCondition){
-
+        meta_data <- NewCondition_df %>% filter(cond_nm %in% two_levels)
+        names(meta_data)[names(meta_data) == cond_nm] <- 'Condition'
     }
+
+    message('Labeling done')
+
+    counts_all <- as.matrix(counts_all[,meta_data$Vantage_ID])
+    pData_rnaseq <- pData_rnaseq %>% filter(pt_ID %in% meta_data$pt_ID)
+    vsd_mat <- vsd_mat[,meta_data$Vantage_ID]
+
+    message('Filtering done')
 
     dds <- DESeqDataSetFromMatrix(
       countData = counts_all,
       colData = meta_data,
       design = ~Batch + Condition, tidy = F)
+
+    message('Design done')
+
     if(correct_gender){
         dds <- DESeqDataSetFromMatrix(
           countData = counts_all,
           colData = meta_data,
           design = ~Batch + Gender + Condition, tidy = F)
     }
+
     dds <- estimateSizeFactors(dds)
 
+    # Generate a transformed matrix with gene symbols
     ens2symbol <- data.frame(cbind(ENSEMBL=as.character(rna_all$Feature), 
         symbol=as.character(rna_all$Feature_gene_name)))
     vsd_mat_sym <- data.frame(vsd_mat) %>% mutate(gene=rownames(.)) %>% as_tibble()
-
     vsd_mat_sym <- vsd_mat_sym %>% 
       inner_join(., ens2symbol, by=c("gene"="ENSEMBL")) %>%
       data.frame()
     rownames(vsd_mat_sym) <- make.names(vsd_mat_sym$symbol, unique=TRUE)
 
+    message('vsd symbols done')
+
     dds$Condition <- relevel(dds$Condition, ref = reference)
     dds <- DESeq(dds, parallel = F)
 
-    res <- results(dds, contrast = c('Condition', two_states))
-    res <- lfcShrink(dds, contrast = c('Condition','two_states'),
+    message('DESeq done')
+
+    res <- results(dds, contrast = c('Condition', two_levels))
+    res <- lfcShrink(dds, contrast = c('Condition',two_levels),
         res=res, type = 'normal')
     res_df <- data.frame(res) %>% mutate(gene=rownames(.)) %>% as_tibble()
 
@@ -181,8 +197,13 @@ DE_analysis <- function(ls_preprocessed,
       data.frame()
     rownames(res_df) <- make.names(res_df$symbol, unique=TRUE)
 
+    message('res symbols done')
+
     DE_res <- list(dds=dds, vsd_mat=vsd_mat, vsd_mat_sym=vsd_mat_sym, 
-        ens2symbol=ens2symbol, res=res, res_df=res_df)
+        ens2symbol=ens2symbol, res=res, res_df=res_df, 
+        pData_rnaseq=pData_rnaseq)
+
+    message('list done')
 
     DE_res
 
@@ -191,60 +212,30 @@ DE_analysis <- function(ls_preprocessed,
 
 
 
-# For SLC7A11
-gene_x <- 'ENSG00000151012.9'
-meta_data <- label_by_gene(vsd_mat, gene=gene_x, p_all, extremes_only=T)
-meta_data <- meta_data %>% filter(level != "normal")
-counts_all <- as.data.frame(counts_all[,meta_data$Vantage_ID])
-pData_rnaseq <- pData_rnaseq %>% filter(pt_ID %in% meta_data$pt_ID)
-vsd_mat <- vsd_mat[,meta_data$Vantage_ID]
-
-dds <- DESeqDataSetFromMatrix(
-  countData = counts_all,
-  colData = meta_data,
-  design = ~Batch + Gender + level, tidy = F  
-)
-dds <- estimateSizeFactors(dds)
-vsd_mat <- data.frame(vsd_mat) %>% mutate(gene=rownames(.)) %>% as_tibble()
-
-ens2symbol <- data.frame(cbind(ENSEMBL=as.character(rna_all$Feature), 
-    symbol=as.character(rna_all$Feature_gene_name)))
-vsd_mat <- vsd_mat %>% 
-  inner_join(., ens2symbol, by=c("gene"="ENSEMBL")) %>%
-  data.frame()
-rownames(vsd_mat) <- make.names(vsd_mat$symbol, unique=TRUE)
-vsd_mat$gene <- NULL
-vsd_mat$symbol <- NULL
-
-
-
-
-dds$level <- relevel(dds$level, ref = "low")
-dds_deg <- DESeq(dds, parallel = F)
-
-res_lv <- results(dds_deg, contrast = c('level','high','low'))
-res_lv <- lfcShrink(dds_deg, contrast = c('level','high','low'),
-    res=res1, type = 'normal')
-dds_level <- data.frame(res_lv) %>% mutate(gene=rownames(.)) %>% as_tibble()
-
-dds_level <- dds_level %>% 
-  inner_join(., ens2symbol, by=c("gene"="ENSEMBL")) %>%
-  data.frame()
-rownames(dds_level) <- make.names(dds_level$symbol, unique=TRUE)
-
-
-dds_level <- data.frame(results(dds_deg)) %>%
-  mutate(gene=rownames(.))  %>%
-  #filter(padj < 0.01) %>%
-  #dplyr::rename(gene = row) %>%
-  arrange(log2FoldChange)
-  #arrange(padj)
 
 
 
 
 
 
+ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData')
+DE_res <- DE_analysis(ls_preprocessed, 
+    GeneBased=TRUE, 
+    pDataBased=FALSE,
+    NewCondition=FALSE,
+    cond_nm='ENSG00000151012.9',
+    reference = 'low', # low, alive
+    correct_gender=FALSE,
+    extremes_only=TRUE)
+
+DE_res2 <- DE_analysis(ls_preprocessed, 
+    GeneBased=FALSE, 
+    pDataBased=TRUE,
+    NewCondition=FALSE,
+    cond_nm='CANARY',
+    two_levels=c('P','G'),
+    reference = 'G', # low, alive
+    correct_gender=FALSE)
 
 
 # Load data
