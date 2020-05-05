@@ -1,18 +1,24 @@
-library(EnhancedVolcano)
-library(readr)
-library(dplyr)
-library(tidyr)
-library(stringr)
-library(DESeq2)
-library(sva)
-library(limma)
-library(ComplexHeatmap)
-library(fgsea)
-library(tibble)
-library(gage)
-library(ggplot2)
-library(org.Hs.eg.db)
-# Check BiocManager::valid()
+
+
+
+environment_set <- function(){
+    library(EnhancedVolcano)
+    library(readr)
+    library(dplyr)
+    library(tidyr)
+    library(stringr)
+    library(DESeq2)
+    library(sva)
+    library(limma)
+    library(ComplexHeatmap)
+    library(fgsea)
+    library(tibble)
+    library(gage)
+    library(ggplot2)
+    library(org.Hs.eg.db)
+    library(clusterProfiler)
+    # Check BiocManager::valid()
+}
 
 preprocess_rna <- function(path_rnaseq, 
     correct_batch=TRUE, 
@@ -78,7 +84,6 @@ preprocess_rna <- function(path_rnaseq,
         pgender_af=pgender_af)
 
     dge_preprocessed
-
 }
 
 label_by_gene <- function(normalized_data, gene, metadata, extremes_only=FALSE){
@@ -201,14 +206,12 @@ DE_analysis <- function(ls_preprocessed,
 
     DE_res <- list(dds=dds, vsd_mat=vsd_mat, vsd_mat_sym=vsd_mat_sym, 
         ens2symbol=ens2symbol, res=res, res_df=res_df, 
-        pData_rnaseq=pData_rnaseq)
+        pData_rnaseq=pData_rnaseq, meta_data=meta_data)
 
     message('list done')
 
     DE_res
-
 }
-
 
 fgsea_analysis <- function(DE_res){
 
@@ -237,7 +240,7 @@ fgsea_analysis <- function(DE_res){
     fgsea_fixed <- function(pthw_path){
         res <- fgsea(pathways=gmtPathways(pthw_path), stats=ranks, nperm=1000) %>%
                     as_tibble %>%
-                    arrange(padj, desc(NES))
+                    arrange(padj, desc(abs(NES)))
         res$state <- ifelse(res$NES > 0, "up", "down")
         res$leadingEdge <- sapply(res$leadingEdge, . %>% {
           str_c(., collapse = " ")})
@@ -260,301 +263,359 @@ fgsea_analysis <- function(DE_res){
         res_c7=res_c7, res_msg=res_msg)
 
     fgsea_res
-
 }
 
 # plots
+heatmap_200 <- function(res_df, vsd_mat, meta_data, pData_rnaseq, n_genes=200,
+    padj_cutoff = 0.05, l2fc_cutoff=1.5, ha_custom=NULL, row_km=2){
+    res_df <- data.frame(res_df) %>%
+        filter(abs(log2FoldChange) > l2fc_cutoff) %>%
+        filter(padj < padj_cutoff) %>%
+        arrange(padj)
 
-heatmap <- function()
-
-volcano <- function()
-
-fgsea_plot <- function(fgsea_res, 
-        pathways_title, 
-        cutoff = 0.05, 
-        max_pathways = 30, 
-        xlabel = "Pathway", 
-        ylabel = "Normalized Enrichment Score", 
-        condition_name){
-
-    color_levels <- function(fgsea_res) {
-        colors <- c()
-        if (any(fgsea_res$state == "down")) {
-          colors <- c(colors, "lightblue")
-        }
-        if (any(fgsea_res$state == "up")) {
-          colors <- c(colors, "#DC143C")
-        }
-        colors
+    if(nrow(res_df)>n_genes){
+        gene_list <- res_df %>%
+            head(n_genes) %>%
+            dplyr::select(gene) %>%
+            pull()
+    }else{
+        gene_list <- res_df %>%
+            dplyr::select(gene) %>%
+            pull()        
     }
 
+    # Use normalized data (vsd_mat) for plot
+    filtered_res <- data.frame(vsd_mat) %>%
+      filter(gene %in% gene_list) %>%
+      as.data.frame()
+    rownames(filtered_res) <- make.names(filtered_res$symbol, unique=TRUE)
+    filtered_res$gene <- NULL
+    filtered_res$symbol <- NULL
 
-    curated_pathways <- fgsea_res %>%
-        dplyr::slice(1:max_pathways)
-    if (!is.null(cutoff)) {
-        curated_pathways %<>% filter(padj < cutoff)
+    ha = HeatmapAnnotation(
+
+        CANARY = as.factor(pData_rnaseq$CANARY),
+        gender = as.factor(pData_rnaseq$Gender),
+        Condition = as.factor(meta_data$Condition),
+
+        simple_anno_size = unit(0.5, "cm")
+    )
+
+    if(!is.null(ha_custom)){
+        ha <- ha_custom
     }
 
-    print(ggplot(curated_pathways, aes(reorder(pathway, NES), NES)) +
-        geom_col(aes(fill = state), width = 0.5, color = "black") +
-        scale_size_manual(values = c(0, 1), guide = "none") +
-        geom_label(aes(label = round(padj, 4)), size = 3) +
-        coord_flip() +
-        labs(
-            x = 'Pathway', 
-            y = "Normalized Enrichment Score",
-            title = str_c(pathways_title, " pathways: ", condition_name),
-            subtitle = str_c("(Cutoff: p.adj <", cutoff, ")")
-        ) +
-        theme_bw() +
-        scale_fill_manual(values = color_levels(curated_pathways)))
+    print(Heatmap(as.matrix(filtered_res), name = "mat", 
+        #column_km = 2, 
+      row_km = row_km,
+      column_split =as.factor(meta_data$Condition),
+      heatmap_legend_param = list(color_bar = "continuous"), 
+      row_names_gp = gpar(fontsize = 8),
+      column_names_gp = gpar(fontsize = 8), top_annotation = ha))
+}
 
+volcano_plot <- function(res_df, gene=NULL, p_title, pCutoff=0.001, FCcutoff=1.5){
+
+    if (!is.null(gene)){
+        k <- which(res_df$gene %in% gene)
+        res_df <- res_df[-k,]
+    }
+    print(EnhancedVolcano(res_df,
+        lab = rownames(res_df),
+        x = 'log2FoldChange',
+        y = 'pvalue',
+        pCutoff=pCutoff,
+        FCcutoff=FCcutoff,
+        xlim = c(-5,5),
+        transcriptPointSize=2,
+        transcriptLabSize=4,
+        title = p_title))
+}
+
+fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05, 
+    max_pathways = 30, condition_name){
+
+        color_levels <- function(fgsea_res) {
+            colors <- c()
+            if (any(fgsea_res$state == "down")) {
+              colors <- c(colors, "lightblue")
+            }
+            if (any(fgsea_res$state == "up")) {
+              colors <- c(colors, "#DC143C")
+            }
+            colors
+        }
+
+        curated_pathways <- fgsea_res %>%
+            dplyr::slice(1:max_pathways)
+        if (!is.null(cutoff)) {
+            curated_pathways %<>% filter(padj < cutoff)
+        }
+
+        print(ggplot(curated_pathways, aes(reorder(pathway, NES), NES)) +
+            geom_col(aes(fill = state), width = 0.5, color = "black") +
+            scale_size_manual(values = c(0, 1), guide = "none") +
+            geom_label(aes(label = round(padj, 4)), size = 3) +
+            coord_flip() +
+            labs(
+                x = 'Pathway', 
+                y = "Normalized Enrichment Score",
+                title = str_c(pathways_title, " pathways: ", condition_name),
+                subtitle = str_c("(Cutoff: p.adj <", cutoff, ")")
+            ) +
+            theme_bw() +
+            scale_fill_manual(values = color_levels(curated_pathways)))
 }
 
 
 
-ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData')
-DE_res <- DE_analysis(ls_preprocessed, 
-    GeneBased=TRUE, 
-    pDataBased=FALSE,
-    NewCondition=FALSE,
-    cond_nm='ENSG00000151012.9',
-    reference = 'low', # low, alive
-    correct_gender=FALSE,
-    extremes_only=TRUE)
-
-DE_res2 <- DE_analysis(ls_preprocessed, 
-    GeneBased=FALSE, 
-    pDataBased=TRUE,
-    NewCondition=FALSE,
-    cond_nm='CANARY',
-    two_levels=c('P','G'),
-    reference = 'G', # low, alive
-    correct_gender=FALSE)
-
-fgsea_res <- fgsea_analysis(DE_res2)
-fgsea_plot(fgsea_res$res_c6, pathways_title='Hallmark', condition_name='G vs P')
 
 
 
-# Load data
-load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData")
+# ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData')
+# DE_res <- DE_analysis(ls_preprocessed, 
+#     GeneBased=TRUE, 
+#     pDataBased=FALSE,
+#     NewCondition=FALSE,
+#     cond_nm='ENSG00000151012.9',
+#     reference = 'low', # low, alive
+#     correct_gender=FALSE,
+#     extremes_only=TRUE)
 
-# Remove duplicates
-dupl <- c('11817', '11840', '12889', '12890', '12929', '13034', '13155', '15002')
-unique_vntg <- p_all %>%
-  filter(., !(pt_ID %in% dupl &
-    grepl("R4163",Vantage_ID))) %>%
-  select(., Vantage_ID) %>%
-  pull()
+# DE_res2 <- DE_analysis(ls_preprocessed, 
+#     GeneBased=FALSE, 
+#     pDataBased=TRUE,
+#     NewCondition=FALSE,
+#     cond_nm='CANARY',
+#     two_levels=c('P','G'),
+#     reference = 'G', # low, alive
+#     correct_gender=FALSE)
 
-p_all <- p_all[which(p_all$Vantage_ID %in% unique_vntg),]
-rna_all <- cbind(rna_all[,1:7], rna_all[,unique_vntg])
-pData_rnaseq <- pData_rnaseq[!duplicated(pData_rnaseq$pt_ID),]
-# pData_rnaseq$pt_ID == p_all$pt_ID # TRUE
-
-# Remove low variance genes from counts
-variances <- apply(rna_all[, 8:ncol(rna_all)], 1, var)
-sdv <- apply(rna_all[, 8:ncol(rna_all)], 1, sd)
-q1 <- quantile(variances, na.rm = T)["25%"]
-idx <- which(is.na(variances) | variances <= q1 | sdv == 0)
-rna_all <- rna_all[-idx, ]
-# result <- WGCNA::collapseRows(rna_all[, 8:ncol(rna_all)],
-#                           rowGroup=rna_all$Feature_gene_name,
-#                           rowID=rownames(rna_all),
-#                           method="function",
-#                           methodFunction=colMeans)
-#counts_all <- round(data.frame(result$datETcollapsed), digits = 0)
-counts_all <- rna_all[, 8:ncol(rna_all)]
-rownames(counts_all) <- rna_all$Feature
-
-# Normalize
-p_all$Batch <- as.factor(p_all$Batch)
-p_all$Gender <- pData_rnaseq$Gender
-dds <- DESeqDataSetFromMatrix(
-  countData = counts_all,
-  colData = p_all,
-  design = ~Batch + Gender, tidy = F  
-)
-dds <- estimateSizeFactors(dds)
-sizeFactors(dds)
-#normalized_counts <- counts(dds, normalized=TRUE)
-vsd <- vst(dds)
-
-# Remove batch effect
-plotPCA(vsd, "Gender")
-plotPCA(vsd, "Batch")
-assay(vsd) <- limma::removeBatchEffect(assay(vsd), vsd$Batch)
-plotPCA(vsd, "Batch")
-plotPCA(vsd, "Gender")
-assay(vsd) <- limma::removeBatchEffect(assay(vsd), vsd$Gender)
-plotPCA(vsd, "Batch")
-plotPCA(vsd, "Gender")
-vsd_mat <- assay(vsd)
-
-# Save pre-processed data
-save(p_all, pData_rnaseq, counts_all, vsd_mat, file='dge_preprocessed.RData')
-
-# Label samples
-load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/dge_preprocessed.RData")
-
-label_by_gene <- function(normalized_data, gene, metadata, extremes_only=FALSE){
-    if(extremes_only){
-        data_t <- data.frame(t(normalized_data))
-        first_q <- quantile(data_t[,gene])[["25%"]]
-        third_q <- quantile(data_t[,gene])[["75%"]]
-        data_t$level <- "normal"
-        data_t$level[data_t[,gene] < first_q] <- "low"
-        data_t$level[data_t[,gene] > third_q] <- "high"
-
-    } else {
-        data_t <- data.frame(t(normalized_data))
-        mid_q <- quantile(data_t[,gene])[["50%"]]
-        data_t$level <- "low"
-        data_t$level[data_t[,gene]  > mid_q] <- "high"
-
-    }
-
-    meta_data <- cbind(metadata, level=data_t$level)
-    meta_data$Batch <- factor(meta_data$Batch)
-    meta_data$Gender <- factor(meta_data$Gender)
-    meta_data$level <- factor(meta_data$level)
-
-    meta_data
-}
-
-# For SLC7A11
-gene_x <- 'ENSG00000151012.9'
-meta_data <- label_by_gene(vsd_mat, gene=gene_x, p_all, extremes_only=T)
-meta_data <- meta_data %>% filter(level != "normal")
-counts_all <- as.data.frame(counts_all[,meta_data$Vantage_ID])
-pData_rnaseq <- pData_rnaseq %>% filter(pt_ID %in% meta_data$pt_ID)
-vsd_mat <- vsd_mat[,meta_data$Vantage_ID]
-
-dds <- DESeqDataSetFromMatrix(
-  countData = counts_all,
-  colData = meta_data,
-  design = ~Batch + Gender + level, tidy = F  
-)
-dds <- estimateSizeFactors(dds)
-sizeFactors(dds)
-vsd <- vst(dds)
-vsd_mat <- assay(vsd)
-vsd_mat <- data.frame(vsd_mat) %>% mutate(gene=rownames(.)) %>% as_tibble()
-
-ens2symbol <- data.frame(cbind(ENSEMBL=as.character(rna_all$Feature), 
-    symbol=as.character(rna_all$Feature_gene_name)))
-vsd_mat <- vsd_mat %>% 
-  inner_join(., ens2symbol, by=c("gene"="ENSEMBL")) %>%
-  data.frame()
-rownames(vsd_mat) <- make.names(vsd_mat$symbol, unique=TRUE)
-vsd_mat$gene <- NULL
-vsd_mat$symbol <- NULL
+# fgsea_res <- fgsea_analysis(DE_res2)
+# fgsea_plot(fgsea_res$res_c6, pathways_title='Hallmark', condition_name='G vs P')
+# heatmap_200(DE_res2$res_df, DE_res2$vsd_mat_sym, DE_res2$meta_data, DE_res2$pData_rnaseq)
+# volcano_plot(DE_res2$res_df, gene=NULL, p_title='test')
 
 
 
+# # Load data
+# load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData")
 
-dds$level <- relevel(dds$level, ref = "low")
-dds_deg <- DESeq(dds, parallel = F)
+# # Remove duplicates
+# dupl <- c('11817', '11840', '12889', '12890', '12929', '13034', '13155', '15002')
+# unique_vntg <- p_all %>%
+#   filter(., !(pt_ID %in% dupl &
+#     grepl("R4163",Vantage_ID))) %>%
+#   select(., Vantage_ID) %>%
+#   pull()
 
-res_lv <- results(dds_deg, contrast = c('level','high','low'))
-res_lv <- lfcShrink(dds_deg, contrast = c('level','high','low'),
-    res=res1, type = 'normal')
-dds_level <- data.frame(res_lv) %>% mutate(gene=rownames(.)) %>% as_tibble()
+# p_all <- p_all[which(p_all$Vantage_ID %in% unique_vntg),]
+# rna_all <- cbind(rna_all[,1:7], rna_all[,unique_vntg])
+# pData_rnaseq <- pData_rnaseq[!duplicated(pData_rnaseq$pt_ID),]
+# # pData_rnaseq$pt_ID == p_all$pt_ID # TRUE
 
-dds_level <- dds_level %>% 
-  inner_join(., ens2symbol, by=c("gene"="ENSEMBL")) %>%
-  data.frame()
-rownames(dds_level) <- make.names(dds_level$symbol, unique=TRUE)
+# # Remove low variance genes from counts
+# variances <- apply(rna_all[, 8:ncol(rna_all)], 1, var)
+# sdv <- apply(rna_all[, 8:ncol(rna_all)], 1, sd)
+# q1 <- quantile(variances, na.rm = T)["25%"]
+# idx <- which(is.na(variances) | variances <= q1 | sdv == 0)
+# rna_all <- rna_all[-idx, ]
+# # result <- WGCNA::collapseRows(rna_all[, 8:ncol(rna_all)],
+# #                           rowGroup=rna_all$Feature_gene_name,
+# #                           rowID=rownames(rna_all),
+# #                           method="function",
+# #                           methodFunction=colMeans)
+# #counts_all <- round(data.frame(result$datETcollapsed), digits = 0)
+# counts_all <- rna_all[, 8:ncol(rna_all)]
+# rownames(counts_all) <- rna_all$Feature
 
+# # Normalize
+# p_all$Batch <- as.factor(p_all$Batch)
+# p_all$Gender <- pData_rnaseq$Gender
+# dds <- DESeqDataSetFromMatrix(
+#   countData = counts_all,
+#   colData = p_all,
+#   design = ~Batch + Gender, tidy = F  
+# )
+# dds <- estimateSizeFactors(dds)
+# sizeFactors(dds)
+# #normalized_counts <- counts(dds, normalized=TRUE)
+# vsd <- vst(dds)
 
-dds_level <- data.frame(results(dds_deg)) %>%
-  mutate(gene=rownames(.))  %>%
-  #filter(padj < 0.01) %>%
-  #dplyr::rename(gene = row) %>%
-  arrange(log2FoldChange)
-  #arrange(padj)
+# # Remove batch effect
+# plotPCA(vsd, "Gender")
+# plotPCA(vsd, "Batch")
+# assay(vsd) <- limma::removeBatchEffect(assay(vsd), vsd$Batch)
+# plotPCA(vsd, "Batch")
+# plotPCA(vsd, "Gender")
+# assay(vsd) <- limma::removeBatchEffect(assay(vsd), vsd$Gender)
+# plotPCA(vsd, "Batch")
+# plotPCA(vsd, "Gender")
+# vsd_mat <- assay(vsd)
 
-top <- dds_level %>%
-  head(50) %>%
-  dplyr::select(gene) %>%
-  pull()
+# # Save pre-processed data
+# save(p_all, pData_rnaseq, counts_all, vsd_mat, file='dge_preprocessed.RData')
 
+# # Label samples
+# load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/dge_preprocessed.RData")
 
-EnhancedVolcano(dds_level,
-    lab = rownames(dds_level),
-    x = 'log2FoldChange',
-    y = 'pvalue',
-    xlim = c(-5,5),
-    title = 'Plot')
+# label_by_gene <- function(normalized_data, gene, metadata, extremes_only=FALSE){
+#     if(extremes_only){
+#         data_t <- data.frame(t(normalized_data))
+#         first_q <- quantile(data_t[,gene])[["25%"]]
+#         third_q <- quantile(data_t[,gene])[["75%"]]
+#         data_t$level <- "normal"
+#         data_t$level[data_t[,gene] < first_q] <- "low"
+#         data_t$level[data_t[,gene] > third_q] <- "high"
 
+#     } else {
+#         data_t <- data.frame(t(normalized_data))
+#         mid_q <- quantile(data_t[,gene])[["50%"]]
+#         data_t$level <- "low"
+#         data_t$level[data_t[,gene]  > mid_q] <- "high"
 
-#DH_gene_list <- readxl::read_excel("~/Downloads/DH_gene_list.xlsx")
-#dh_genes <- DH_gene_list$Feature_gene_name
+#     }
 
-gene_list <- top
+#     meta_data <- cbind(metadata, level=data_t$level)
+#     meta_data$Batch <- factor(meta_data$Batch)
+#     meta_data$Gender <- factor(meta_data$Gender)
+#     meta_data$level <- factor(meta_data$level)
 
-# Use normalized data (vsd_mat) for plot
-filtered_res <- data.frame(vsd_mat) %>%
-  mutate(gene=rownames(.)) %>%
-  filter(gene %in% gene_list) %>%
-  #select(gene, all_of(low_high_patients)) %>%
-  as.data.frame()
-rownames(filtered_res) <- filtered_res$gene
-filtered_res$gene <- NULL
+#     meta_data
+# }
 
-# Plot
-ha = HeatmapAnnotation(
+# # For SLC7A11
+# gene_x <- 'ENSG00000151012.9'
+# meta_data <- label_by_gene(vsd_mat, gene=gene_x, p_all, extremes_only=T)
+# meta_data <- meta_data %>% filter(level != "normal")
+# counts_all <- as.data.frame(counts_all[,meta_data$Vantage_ID])
+# pData_rnaseq <- pData_rnaseq %>% filter(pt_ID %in% meta_data$pt_ID)
+# vsd_mat <- vsd_mat[,meta_data$Vantage_ID]
 
-    CANARY = as.factor(pData_rnaseq$CANARY),
-    gender = as.factor(pData_rnaseq$Gender),
-    SLC7A11_level = as.factor(meta_data$level),
+# dds <- DESeqDataSetFromMatrix(
+#   countData = counts_all,
+#   colData = meta_data,
+#   design = ~Batch + Gender + level, tidy = F  
+# )
+# dds <- estimateSizeFactors(dds)
+# sizeFactors(dds)
+# vsd <- vst(dds)
+# vsd_mat <- assay(vsd)
+# vsd_mat <- data.frame(vsd_mat) %>% mutate(gene=rownames(.)) %>% as_tibble()
 
-    simple_anno_size = unit(0.5, "cm")
-)
-
-Heatmap(as.matrix(filtered_res), name = "mat", 
-    #column_km = 2, 
-    #row_km = 5,
-  #column_split =as.factor(pData_rnaseq$CANARY),
-  column_split =as.factor(meta_data$level),
-  heatmap_legend_param = list(color_bar = "continuous"), 
-  row_names_gp = gpar(fontsize = 8),
-  column_names_gp = gpar(fontsize = 8), top_annotation = ha)
+# ens2symbol <- data.frame(cbind(ENSEMBL=as.character(rna_all$Feature), 
+#     symbol=as.character(rna_all$Feature_gene_name)))
+# vsd_mat <- vsd_mat %>% 
+#   inner_join(., ens2symbol, by=c("gene"="ENSEMBL")) %>%
+#   data.frame()
+# rownames(vsd_mat) <- make.names(vsd_mat$symbol, unique=TRUE)
+# vsd_mat$gene <- NULL
+# vsd_mat$symbol <- NULL
 
 
 
 
+# dds$level <- relevel(dds$level, ref = "low")
+# dds_deg <- DESeq(dds, parallel = F)
 
-# Pathway analysis
+# res_lv <- results(dds_deg, contrast = c('level','high','low'))
+# res_lv <- lfcShrink(dds_deg, contrast = c('level','high','low'),
+#     res=res1, type = 'normal')
+# dds_level <- data.frame(res_lv) %>% mutate(gene=rownames(.)) %>% as_tibble()
 
-#GSEA
+# dds_level <- dds_level %>% 
+#   inner_join(., ens2symbol, by=c("gene"="ENSEMBL")) %>%
+#   data.frame()
+# rownames(dds_level) <- make.names(dds_level$symbol, unique=TRUE)
 
-ranks <- dds_level %>%
-  select(symbol,stat) %>%
-  na.omit() %>% 
-  distinct() %>% 
-  group_by(symbol) %>% 
-  summarize(stat=mean(stat))
 
-ranks <- deframe(ranks)
+# dds_level <- data.frame(results(dds_deg)) %>%
+#   mutate(gene=rownames(.))  %>%
+#   #filter(padj < 0.01) %>%
+#   #dplyr::rename(gene = row) %>%
+#   arrange(log2FoldChange)
+#   #arrange(padj)
 
-pthw_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/h.all.v7.1.symbols.gmt'
+# top <- dds_level %>%
+#   head(50) %>%
+#   dplyr::select(gene) %>%
+#   pull()
 
-pathways_hallmark <- gmtPathways(pthw_path)
-fgseaRes <- fgsea(pathways=pathways_hallmark, stats=ranks, nperm=1000)
 
-fgseaResTidy <- fgseaRes %>%
-  as_tibble() %>%
-  arrange(desc(NES))
+# EnhancedVolcano(dds_level,
+#     lab = rownames(dds_level),
+#     x = 'log2FoldChange',
+#     y = 'pvalue',
+#     xlim = c(-5,5),
+#     title = 'Plot')
 
-ggplot(fgseaResTidy, aes(reorder(pathway, NES), NES)) +
-  geom_col(aes(fill=padj<0.01)) +
-  coord_flip() +
-  labs(x="Pathway", y="Normalized Enrichment Score",
-       title="Hallmark pathways NES from GSEA") + 
-  theme_minimal()
 
-# KEGG
+# #DH_gene_list <- readxl::read_excel("~/Downloads/DH_gene_list.xlsx")
+# #dh_genes <- DH_gene_list$Feature_gene_name
 
-library(clusterProfiler)
+# gene_list <- top
+
+# # Use normalized data (vsd_mat) for plot
+# filtered_res <- data.frame(vsd_mat) %>%
+#   mutate(gene=rownames(.)) %>%
+#   filter(gene %in% gene_list) %>%
+#   #select(gene, all_of(low_high_patients)) %>%
+#   as.data.frame()
+# rownames(filtered_res) <- filtered_res$gene
+# filtered_res$gene <- NULL
+
+# # Plot
+# ha = HeatmapAnnotation(
+
+#     CANARY = as.factor(pData_rnaseq$CANARY),
+#     gender = as.factor(pData_rnaseq$Gender),
+#     SLC7A11_level = as.factor(meta_data$level),
+
+#     simple_anno_size = unit(0.5, "cm")
+# )
+
+# Heatmap(as.matrix(filtered_res), name = "mat", 
+#     #column_km = 2, 
+#     #row_km = 5,
+#   #column_split =as.factor(pData_rnaseq$CANARY),
+#   column_split =as.factor(meta_data$level),
+#   heatmap_legend_param = list(color_bar = "continuous"), 
+#   row_names_gp = gpar(fontsize = 8),
+#   column_names_gp = gpar(fontsize = 8), top_annotation = ha)
+
+
+
+
+
+# # Pathway analysis
+
+# #GSEA
+
+# ranks <- dds_level %>%
+#   select(symbol,stat) %>%
+#   na.omit() %>% 
+#   distinct() %>% 
+#   group_by(symbol) %>% 
+#   summarize(stat=mean(stat))
+
+# ranks <- deframe(ranks)
+
+# pthw_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/h.all.v7.1.symbols.gmt'
+
+# pathways_hallmark <- gmtPathways(pthw_path)
+# fgseaRes <- fgsea(pathways=pathways_hallmark, stats=ranks, nperm=1000)
+
+# fgseaResTidy <- fgseaRes %>%
+#   as_tibble() %>%
+#   arrange(desc(NES))
+
+# ggplot(fgseaResTidy, aes(reorder(pathway, NES), NES)) +
+#   geom_col(aes(fill=padj<0.01)) +
+#   coord_flip() +
+#   labs(x="Pathway", y="Normalized Enrichment Score",
+#        title="Hallmark pathways NES from GSEA") + 
+#   theme_minimal()
+
+# # KEGG
+
+# library(clusterProfiler)
