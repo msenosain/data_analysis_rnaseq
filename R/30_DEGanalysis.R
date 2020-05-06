@@ -60,7 +60,7 @@ preprocess_rna <- function(path_rnaseq,
     vsd <- vst(dds)
 
 
-    pbatch_bf <- plotPCA(vsd, "Batch", title = "Batch raw",)
+    pbatch_bf <- plotPCA(vsd, "Batch", title = "Batch raw")
     pgender_bf <- plotPCA(vsd, "Gender", title = "Gender raw")
     
     # Remove batch effect
