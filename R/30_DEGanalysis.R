@@ -139,7 +139,7 @@ DE_analysis <- function(ls_preprocessed,
     }
     
     if(pDataBased){
-        meta_data <- pData_rnaseq %>% select(pt_ID, all_of(cond_nm))
+        meta_data <- pData_rnaseq %>% dplyr::select(pt_ID, all_of(cond_nm))
         meta_data$pt_ID <- as.character(meta_data$pt_ID)
         p_all$pt_ID <- as.character(p_all$pt_ID)
         meta_data <- inner_join(p_all, meta_data, by='pt_ID')
