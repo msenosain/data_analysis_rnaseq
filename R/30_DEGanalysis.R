@@ -60,20 +60,20 @@ preprocess_rna <- function(path_rnaseq,
     vsd <- vst(dds)
 
 
-    pbatch_bf <- plotPCA(vsd, "Batch")
-    pgender_bf <- plotPCA(vsd, "Gender")
+    pbatch_bf <- plotPCA(vsd, "Batch", title = "Batch raw",)
+    pgender_bf <- plotPCA(vsd, "Gender", title = "Gender raw")
     
     # Remove batch effect
     if(correct_batch&correct_gender){
         assay(vsd) <- limma::removeBatchEffect(assay(vsd), 
             batch=vsd$Batch, batch2=vsd$Gender)
-        pbatch_af <- plotPCA(vsd, "Batch")
-        pgender_af <- plotPCA(vsd, "Gender")
+        pbatch_af <- plotPCA(vsd, "Batch", title = "Batch after BE & GE removal")
+        pgender_af <- plotPCA(vsd, "Gender", title = "Gender after BE & GE removal")
     } else if(correct_batch){
         assay(vsd) <- limma::removeBatchEffect(assay(vsd), 
             batch=vsd$Batch)
-        pbatch_af <- plotPCA(vsd, "Batch")
-        pgender_af <- plotPCA(vsd, "Gender")       
+        pbatch_af <- plotPCA(vsd, "Batch", title = "Batch after BE removal")
+        pgender_af <- plotPCA(vsd, "Gender", title = "Gender after BE removal")       
     }
     vsd_mat <- assay(vsd)
 
