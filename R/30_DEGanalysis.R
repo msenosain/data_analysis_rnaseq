@@ -219,7 +219,7 @@ fgsea_analysis <- function(DE_res){
     res_df=DE_res$res_df
 
     ranks <- res_df %>%
-      select(symbol,stat) %>%
+      dplyr::select(symbol,stat) %>%
       na.omit() %>% 
       distinct() %>% 
       group_by(symbol) %>% 
@@ -349,7 +349,7 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
         curated_pathways <- fgsea_res %>%
             dplyr::slice(1:max_pathways)
         if (!is.null(cutoff)) {
-            curated_pathways %<>% filter(padj < cutoff)
+            curated_pathways %>% filter(padj < cutoff)
         }
 
         print(ggplot(curated_pathways, aes(reorder(pathway, NES), NES)) +
