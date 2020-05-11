@@ -145,8 +145,14 @@ DE_analysis <- function(ls_preprocessed,
     }
 
     if(NewCondition){
+        meta_data <- NewCondition_df
+        print(meta_data)
         names(meta_data)[names(meta_data) == cond_nm] <- 'Condition'
-        meta_data <- NewCondition_df %>% filter(cond_nm %in% two_levels)
+        print(meta_data)
+        meta_data$Condition <- as.character(meta_data$Condition)
+        print(meta_data)
+        meta_data <- meta_data %>% filter(Condition %in% two_levels)
+        print(meta_data)
     }
 
     message('Labeling done')
@@ -177,9 +183,7 @@ DE_analysis <- function(ls_preprocessed,
     ens2symbol <- data.frame(cbind(ENSEMBL=as.character(rna_all$Feature), 
         symbol=as.character(rna_all$Feature_gene_name)))
     vsd_mat_sym <- data.frame(vsd_mat) %>% mutate(gene=rownames(.)) %>% as_tibble()
-    vsd_mat_sym <- vsd_mat_sym %>% 
-      inner_join(., ens2symbol, by=c("gene"="ENSEMBL")) %>%
-      data.frame()
+    vsd_mat_sym <- inner_join(vsd_mat_sym, ens2symbol, by=c("gene"="ENSEMBL"))
     rownames(vsd_mat_sym) <- make.names(vsd_mat_sym$symbol, unique=TRUE)
 
     message('vsd symbols done')
