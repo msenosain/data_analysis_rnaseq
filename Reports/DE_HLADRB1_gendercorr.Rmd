@@ -1,0 +1,140 @@
+---
+title: "HLA-DRB1"
+author: "Mafe Senosain"
+date: "5/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
+environment_set()
+```
+
+# Pre-processing of the data
+```{r}
+ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData', correct_batch = T, correct_gender = T)
+```
+
+# Exploring data
+
+## Batch effect correction
+```{r}
+print(ls_preprocessed$pbatch_bf)
+print(ls_preprocessed$pgender_bf)
+print(ls_preprocessed$pbatch_af)
+print(ls_preprocessed$pgender_af)
+```
+
+## HLA genes
+
+```{r}
+names(ls_preprocessed)
+
+n_genes <- 5000
+vsd_mat <- ls_preprocessed$vsd_mat
+variances <- apply(vsd_mat, 1, var)
+top_genes <- data.frame(vsd_mat) %>%
+  mutate(gene=rownames(.),
+         symbol=ls_preprocessed$rna_all$Feature_gene_name,
+         variances = variances) %>%
+  arrange(desc(variances)) %>%
+  dplyr::select(gene, symbol) %>%
+  head(n_genes)
+vsd_mat5k<- vsd_mat[top_genes$gene,]
+rownames(vsd_mat5k) <- top_genes$symbol
+
+idx <- grep('HLA-DR', ls_preprocessed$rna_all$Feature_gene_name)
+hla_id <- as.character(ls_preprocessed$rna_all$Feature[idx])
+hla_sym <- as.character(ls_preprocessed$rna_all$Feature_gene_name[idx])
+
+k <- which(hla_id %in% top_genes$gene)
+as_tibble(cbind(hla_id[k],hla_sym[k]))
+
+vsd_mat5k <- vsd_mat5k[which(rownames(vsd_mat5k)%in% hla_sym),]
+dim(vsd_mat5k)
+
+
+corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
+# Hierarchical clustering
+d <- dist(corr_pt$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+sub_grp <- cutree(hc1, k = 2)
+Cluster <- as.data.frame(cbind(Vantage_ID=names(sub_grp), Cluster=sub_grp))
+HLADR_clusters <- inner_join(ls_preprocessed$p_all, Cluster, by = 'Vantage_ID')
+
+corr_gn <- Hmisc::rcorr(t(vsd_mat5k), type = 'spearman')
+# Hierarchical clustering
+d <- dist(corr_gn$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+set.seed(455)
+Heatmap(corr_pt$r, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+Heatmap(corr_gn$r, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+Heatmap(vsd_mat5k, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+```
+
+# DE analysis
+
+```{r}
+DE_res <- DE_analysis(ls_preprocessed, 
+           GeneBased=FALSE, 
+           pDataBased=FALSE,
+           NewCondition=TRUE,
+           NewCondition_df=HLADR_clusters,
+           cond_nm='Cluster',
+           reference = '1', # low, alive
+           correct_gender=TRUE,
+           two_levels=c('2','1'))
+
+
+```
+
+## DE results
+```{r}
+heatmap_200(DE_res$res_df, DE_res$vsd_mat_sym, DE_res$meta_data, DE_res$pData_rnaseq, l2fc_cutoff=1)
+x <- DE_res$res_df %>%
+  arrange(desc(abs(log2FoldChange)))
+rownames(x) <- make.names(x$symbol, unique = T)
+#k <- c('ENSG00000196126.6', 'ENSG00000198502.5')
+#x <- x[-which(x$gene %in%k),]
+head(x, 10)
+volcano_plot(x, gene=NULL, p_title='HLA-DRB1',FCcutoff=1)
+
+```
+
+## Pathway enrichment analysis fGSEA
+Low SLC7A11 is the reference. When SLC7A11 is high, pathways shown below are up- or down- regulated
+```{r}
+fgsea_res <- fgsea_analysis(DE_res)
+
+fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='HLA-DRB1 low vs high')
+fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='HLA-DRB1 low vs high')
+fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='HLA-DRB1 low vs high')
+fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='HLA-DRB1 low vs high')
+fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='HLA-DRB1 low vs high')
+fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='HLA-DRB1 low vs high')
+fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='HLA-DRB1 low vs high')
+fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='HLA-DRB1 low vs high')
+fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='HLA-DRB1 low vs high')
+```

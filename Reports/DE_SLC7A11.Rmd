@@ -1,0 +1,71 @@
+---
+title: "DE SLC7A11"
+author: "Mafe Senosain"
+date: "5/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
+environment_set()
+```
+
+# Pre-processing of the data
+```{r}
+ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData', correct_batch = T, correct_gender = F)
+```
+
+# Exploring data
+
+## Batch effect correction
+```{r}
+print(ls_preprocessed$pbatch_bf)
+print(ls_preprocessed$pgender_bf)
+print(ls_preprocessed$pbatch_af)
+print(ls_preprocessed$pgender_af)
+```
+
+# DE analysis
+
+```{r}
+DE_res <- DE_analysis(ls_preprocessed, 
+           GeneBased=TRUE, 
+           pDataBased=FALSE,
+           NewCondition=FALSE,
+           cond_nm='ENSG00000151012.9',
+           reference = 'low', # low, alive
+           correct_gender=FALSE,
+           extremes_only=TRUE)
+
+
+```
+
+## DE results
+```{r}
+heatmap_200(DE_res$res_df, DE_res$vsd_mat_sym, DE_res$meta_data, DE_res$pData_rnaseq)
+x <- DE_res$res_df %>%
+  arrange(desc(abs(log2FoldChange)))
+rownames(x) <- make.names(x$symbol, unique = T)
+k <- c('ENSG00000250033.1', 'ENSG00000151012.9')
+x <- x[-which(x$gene %in%k),]
+head(x, 10)
+volcano_plot(x, gene=NULL, p_title='SLC7A11')
+
+```
+
+## Pathway enrichment analysis fGSEA
+Low SLC7A11 is the reference. When SLC7A11 is high, pathways shown below are up- or down- regulated
+```{r}
+fgsea_res <- fgsea_analysis(DE_res)
+
+fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='SLC7A11 low vs high')
+fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='SLC7A11 low vs high')
+fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='SLC7A11 low vs high')
+fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='SLC7A11 low vs high')
+fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='SLC7A11 low vs high')
+fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='SLC7A11 low vs high')
+fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='SLC7A11 low vs high')
+fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='SLC7A11 low vs high')
+fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='SLC7A11 low vs high')
+```

@@ -1,0 +1,64 @@
+---
+title: "DE CANARY G vs P"
+author: "Mafe Senosain"
+date: "5/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
+environment_set()
+```
+
+# Pre-processing of the data
+```{r}
+ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData', correct_batch = T, correct_gender = F)
+```
+
+# Exploring data
+
+## Batch effect correction
+```{r}
+print(ls_preprocessed$pbatch_bf)
+print(ls_preprocessed$pgender_bf)
+print(ls_preprocessed$pbatch_af)
+print(ls_preprocessed$pgender_af)
+```
+
+# DE analysis
+
+```{r}
+DE_res <- DE_analysis(ls_preprocessed, 
+           GeneBased=FALSE, 
+           pDataBased=TRUE,
+           NewCondition=FALSE,
+           cond_nm='CANARY',
+           two_levels=c('P','G'),
+           reference = 'G',
+           correct_gender=FALSE)
+
+```
+
+## DE results
+```{r}
+heatmap_200(DE_res$res_df, DE_res$vsd_mat_sym, DE_res$meta_data, DE_res$pData_rnaseq)
+volcano_plot(DE_res$res_df, gene=NULL, p_title='CANARY: G vs P')
+
+```
+
+## Pathway enrichment analysis fGSEA
+CANARY Good prognosis (G) is the reference. When sample is P, pathways shown below are up- or down- regulated
+```{r}
+fgsea_res <- fgsea_analysis(DE_res)
+
+fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='CANARY: G vs P')
+fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='CANARY: G vs P')
+fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='CANARY: G vs P')
+fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='CANARY: G vs P')
+fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='CANARY: G vs P')
+fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='CANARY: G vs P')
+fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='CANARY: G vs P')
+fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='CANARY: G vs P')
+fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='CANARY: G vs P')
+```
