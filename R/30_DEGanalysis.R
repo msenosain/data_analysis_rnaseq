@@ -23,11 +23,16 @@ preprocess_rna <- function(path_rnaseq,
     # Load data
     load(path_rnaseq)
 
+    # Remove low quality samples
+    qc_R4163 <- paste0('R4163_YZ_', c('4','12','13','14','15','27'))
+    qc_R3388 <- paste0('R3388_YZ_',c('8', '45'))
+
     # Remove duplicates
-    dupl <- c('11817', '11840', '12889', '12890', '12929', '13034', '13155', '15002')
+    dupl <- c('11817', '12889', '12929', '15002') #11840 13034 12890 13155
     unique_vntg <- p_all %>%
       filter(., !(pt_ID %in% dupl &
-        grepl("R4163",Vantage_ID))) %>%
+        grepl("R4163",Vantage_ID)),
+        !(Vantage_ID %in% c(qc_R4163,qc_R3388))) %>%
       dplyr::select(., Vantage_ID) %>%
       pull()
 
