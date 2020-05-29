@@ -38,6 +38,7 @@ preprocess_rna <- function(path_rnaseq,
 
     p_all <- p_all[which(p_all$Vantage_ID %in% unique_vntg),]
     rna_all <- cbind(rna_all[,1:7], rna_all[,unique_vntg])
+    pData_rnaseq <- pData_rnaseq[!duplicated(pData_rnaseq$pt_ID),]
     pData_rnaseq$pt_ID <- as.character(pData_rnaseq$pt_ID)
     pData_rnaseq <- pData_rnaseq[which(pData_rnaseq$pt_ID %in% p_all$pt_ID),]
     p_all <- arrange(p_all, pt_ID)
