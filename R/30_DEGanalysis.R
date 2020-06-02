@@ -363,7 +363,7 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
         curated_pathways <- fgsea_res %>%
             dplyr::slice(1:max_pathways)
         
-
+        print(curated_pathways)
         print(ggplot(curated_pathways, aes(reorder(pathway, NES), NES)) +
             geom_col(aes(fill = state), width = 0.5, color = "black") +
             scale_size_manual(values = c(0, 1), guide = "none") +
