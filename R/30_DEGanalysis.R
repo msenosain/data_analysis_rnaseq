@@ -25,7 +25,7 @@ preprocess_rna <- function(path_rnaseq,
 
     # Remove low quality samples
     qc_R4163 <- paste0('R4163_YZ_', c('4','12','13','14','15','27'))
-    qc_R3388 <- paste0('R3388_YZ_', c('45'))
+    qc_R3388 <- paste0('R3388_YZ_', c('8', '45'))
 
     # Remove duplicates
     dupl <- c('11817', '12889', '12929', '15002') #11840 13034 12890 13155
@@ -316,7 +316,7 @@ heatmap_200 <- function(res_df, vsd_mat, meta_data, pData_rnaseq, n_genes=200,
 
     print(Heatmap(as.matrix(filtered_res), name = "mat", 
         #column_km = 2, 
-      row_km = row_km,
+      #row_km = row_km,
       column_split =as.factor(meta_data$Condition),
       heatmap_legend_param = list(color_bar = "continuous"), 
       row_names_gp = gpar(fontsize = 8),
