@@ -304,7 +304,7 @@ heatmap_200 <- function(res_df, vsd_mat, meta_data, pData_rnaseq, n_genes=200,
     ha = HeatmapAnnotation(
 
         CANARY = as.factor(pData_rnaseq$CANARY),
-        gender = as.factor(pData_rnaseq$Gender),
+        #gender = as.factor(pData_rnaseq$Gender),
         Condition = as.factor(meta_data$Condition),
 
         simple_anno_size = unit(0.5, "cm")
