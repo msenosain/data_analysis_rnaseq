@@ -14,6 +14,11 @@ environment_set()
 # Pre-processing of the data
 ```{r}
 ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData', correct_batch = T, correct_gender = T)
+x <- data.frame(ls_preprocessed$vsd_mat)
+x <- cbind('ID'=rownames(x), x)
+#x <- cbind('ID'=ls_preprocessed$rna_all$Feature_gene_name, x)
+write.table(x, file = "vst_normed.txt", sep = "\t", row.names = F, quote = F)
+
 ```
 
 # Exploring data
@@ -35,8 +40,8 @@ names(ls_preprocessed)
 dim(ls_preprocessed$vsd_mat)
 corr_pt <- Hmisc::rcorr(ls_preprocessed$vsd_mat, type = 'spearman')
 Heatmap(corr_pt$r, name = "mat", 
-        column_km = 3, 
-        row_km = 3,
+        #column_km = 3, 
+        #row_km = 3,
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
         column_names_gp = gpar(fontsize = 8))
@@ -45,6 +50,347 @@ Heatmap(corr_pt$r, name = "mat",
 d <- dist(corr_pt$r)
 hc1 <- hclust(d)
 plot(hc1, cex = 0.6, hang = -1)
+```
+
+```{r}
+library("factoextra")
+pca_vsd <- prcomp(t(ls_preprocessed$vsd_mat), scale. = T)
+eig.val <- get_eigenvalue(pca_vsd)
+eig.val
+fviz_eig(pca_vsd, addlabels = TRUE, ylim = c(0, 50))
+# Extract the results for individuals only
+ind <- get_pca_ind(pca_vsd)
+# Extract the results for variables only
+vars <- get_pca_var(pca_vsd)
+data.frame(vars$contrib)
+dim1_q3 <- summary(vars$contrib[,1])[5]
+dim2_q3 <- summary(vars$contrib[,2])[5]
+top_genes_i <- unique(which(vars$contrib[,1] >dim1_q3), which(vars$contrib[,2] >dim2_q3))
+top_genes <- rownames(data.frame(vars$contrib))[top_genes_i]
+
+corr_pt <- Hmisc::rcorr(ls_preprocessed$vsd_mat[top_genes,], type = 'spearman')
+Heatmap(corr_pt$r, name = "mat", 
+        #column_km = 3, 
+        #row_km = 3,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+# Hierarchical clustering
+d <- dist(corr_pt$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+#clustering
+k <- 2
+hc1 <- hclust(d, method = 'complete')
+hc2 <- hclust(d, method = 'average')
+hc3 <- hclust(d, method = 'mcquitty')
+hc4 <- hclust(d, method = 'ward.D')
+
+sub_grp1 <- cutree(hc1, k = k)
+sub_grp2 <- cutree(hc2, k = k)
+sub_grp3 <- cutree(hc3, k = k)
+sub_grp4 <- cutree(hc4, k = k)
+kmns <- kmeans(corr_pt$r, centers = k)
+clusters <- as.data.frame(cbind(Vantage_ID=names(sub_grp1), 
+                                hclust_com=sub_grp1, 
+                                hclust_ave=sub_grp2, 
+                                hclust_mq=sub_grp3, 
+                                hclust_w=sub_grp4, 
+                                k_means = kmns$cluster))
+
+ha = rowAnnotation(
+
+    hclust_com = as.factor(clusters$hclust_com),
+    hclust_ave = as.factor(clusters$hclust_ave),
+    hclust_mq = as.factor(clusters$hclust_mq),
+    hclust_w = as.factor(clusters$hclust_w),
+    k_means = as.factor(clusters$k_means),
+
+    simple_anno_size = unit(0.5, "cm")
+)
+
+Heatmap(corr_pt$r, name = "mat", 
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8), right_annotation = ha)
+
+
+```
+
+
+```{r}
+# gene_sym <- read.delim("~/Documents/Massion_lab/RNASeq_summary/Results_21_May_20_1/Clusters_Objects.tsv")[-1,]
+# top_genes <-  sort(as.character(unique(as.vector(as.matrix(gene_sym)))))[-1]
+
+gene_ID <-read.delim("~/Documents/Massion_lab/RNASeq_summary/Results_29_May_20/Clusters_Objects.tsv")[-1,]
+top_genes <-  sort(as.character(unique(as.vector(as.matrix(gene_ID)))))[-1]
+
+corr_pt <- Hmisc::rcorr(ls_preprocessed$vsd_mat[top_genes,], type = 'spearman')
+Heatmap(corr_pt$r, name = "mat", 
+        #column_km = 3, 
+        #row_km = 3,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+# Hierarchical clustering
+d <- dist(corr_pt$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+#clustering
+k <- 4
+hc1 <- hclust(d, method = 'complete')
+hc2 <- hclust(d, method = 'average')
+hc3 <- hclust(d, method = 'mcquitty')
+hc4 <- hclust(d, method = 'ward.D')
+
+sub_grp1 <- cutree(hc1, k = k)
+sub_grp2 <- cutree(hc2, k = k)
+sub_grp3 <- cutree(hc3, k = k)
+sub_grp4 <- cutree(hc4, k = k)
+kmns <- kmeans(corr_pt$r, centers = k)
+clusters <- as.data.frame(cbind(Vantage_ID=names(sub_grp1), 
+                                hclust_com=sub_grp1, 
+                                hclust_ave=sub_grp2, 
+                                hclust_mq=sub_grp3, 
+                                hclust_w=sub_grp4, 
+                                k_means = kmns$cluster))
+
+ha = rowAnnotation(
+
+    hclust_com = as.factor(clusters$hclust_com),
+    hclust_ave = as.factor(clusters$hclust_ave),
+    hclust_mq = as.factor(clusters$hclust_mq),
+    hclust_w = as.factor(clusters$hclust_w),
+    k_means = as.factor(clusters$k_means),
+
+    simple_anno_size = unit(0.5, "cm")
+)
+
+Heatmap(corr_pt$r, name = "mat", 
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8), right_annotation = ha)
+
+
+```
+
+```{r}
+gene_sym <- read.delim("~/Documents/Massion_lab/RNASeq_summary/Results_21_May_20_1/Clusters_Objects.tsv")[-1,]
+top_genes <-  sort(as.character(unique(as.vector(as.matrix(gene_sym)))))[-1]
+
+#table(ls_preprocessed$rna_all$Feature == rownames(ls_preprocessed$vsd_mat))
+x <- ls_preprocessed$vsd_mat
+#rownames(x) <- ls_preprocessed$rna_all$Feature_gene_name
+result <- WGCNA::collapseRows(x,
+                           rowGroup=ls_preprocessed$rna_all$Feature_gene_name,
+                           rowID=rownames(x),
+                           method="function",
+                           methodFunction=sum)
+x2 <- data.frame(result$datETcollapsed)
+
+corr_pt <- Hmisc::rcorr(as.matrix(x2[top_genes,]), type = 'spearman')
+Heatmap(corr_pt$r, name = "mat", 
+        #column_km = 3, 
+        #row_km = 3,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+# Hierarchical clustering
+d <- dist(corr_pt$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+#clustering
+k <- 4
+hc1 <- hclust(d, method = 'complete')
+hc2 <- hclust(d, method = 'average')
+hc3 <- hclust(d, method = 'mcquitty')
+hc4 <- hclust(d, method = 'ward.D')
+
+sub_grp1 <- cutree(hc1, k = k)
+sub_grp2 <- cutree(hc2, k = k)
+sub_grp3 <- cutree(hc3, k = k)
+sub_grp4 <- cutree(hc4, k = k)
+kmns <- kmeans(corr_pt$r, centers = k)
+clusters <- as.data.frame(cbind(Vantage_ID=names(sub_grp1), 
+                                hclust_com=sub_grp1, 
+                                hclust_ave=sub_grp2, 
+                                hclust_mq=sub_grp3, 
+                                hclust_w=sub_grp4, 
+                                k_means = kmns$cluster))
+
+ha = rowAnnotation(
+
+    hclust_com = as.factor(clusters$hclust_com),
+    hclust_ave = as.factor(clusters$hclust_ave),
+    hclust_mq = as.factor(clusters$hclust_mq),
+    hclust_w = as.factor(clusters$hclust_w),
+    k_means = as.factor(clusters$k_means),
+
+    simple_anno_size = unit(0.5, "cm")
+)
+
+Heatmap(corr_pt$r, name = "mat", 
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8), right_annotation = ha)
+
+
+```
+
+```{r}
+gene_ID <-read.delim("~/Documents/Massion_lab/RNASeq_summary/Results_21_May_20/Clusters_Objects.tsv")[-1,]
+top_genes <-  sort(as.character(unique(as.vector(as.matrix(gene_ID)))))[-1]
+gene_ID_X <- pivot_longer(gene_ID, cols = 1:4)
+gene_ID_X$value <- as.character(gene_ID_X$value)
+k_i<- which(gene_ID_X$value == '')
+gene_ID_X<- gene_ID_X[-k_i,]
+
+x <- ls_preprocessed$vsd_mat[top_genes,]
+x <- x[gene_ID_X$value,]
+
+result <- WGCNA::collapseRows(x,
+                           rowGroup=gene_ID_X$name,
+                           rowID=rownames(x),
+                           method="function",
+                           methodFunction=mean)
+x2 <- data.frame(result$datETcollapsed)
+
+corr_pt <- Hmisc::rcorr(as.matrix(x2), type = 'spearman')
+Heatmap(corr_pt$r, name = "mat", 
+        #column_km = 3, 
+        #row_km = 3,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+# Hierarchical clustering
+d <- dist(corr_pt$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+#clustering
+k <- 4
+hc1 <- hclust(d, method = 'complete')
+hc2 <- hclust(d, method = 'average')
+hc3 <- hclust(d, method = 'mcquitty')
+hc4 <- hclust(d, method = 'ward.D')
+
+sub_grp1 <- cutree(hc1, k = k)
+sub_grp2 <- cutree(hc2, k = k)
+sub_grp3 <- cutree(hc3, k = k)
+sub_grp4 <- cutree(hc4, k = k)
+kmns <- kmeans(corr_pt$r, centers = k)
+clusters <- as.data.frame(cbind(Vantage_ID=names(sub_grp1), 
+                                hclust_com=sub_grp1, 
+                                hclust_ave=sub_grp2, 
+                                hclust_mq=sub_grp3, 
+                                hclust_w=sub_grp4, 
+                                k_means = kmns$cluster))
+
+ha = rowAnnotation(
+
+    hclust_com = as.factor(clusters$hclust_com),
+    hclust_ave = as.factor(clusters$hclust_ave),
+    hclust_mq = as.factor(clusters$hclust_mq),
+    hclust_w = as.factor(clusters$hclust_w),
+    k_means = as.factor(clusters$k_means),
+
+    simple_anno_size = unit(0.5, "cm")
+)
+
+Heatmap(corr_pt$r, name = "mat", 
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8), right_annotation = ha)
+
+
+```
+
+
+```{r}
+gene_sym <- read.delim("~/Documents/Massion_lab/RNASeq_summary/Results_21_May_20_1/Clusters_Objects.tsv")[-1,]
+top_genes <-  sort(as.character(unique(as.vector(as.matrix(gene_sym)))))[-1]
+#table(ls_preprocessed$rna_all$Feature == rownames(ls_preprocessed$vsd_mat))
+x <- ls_preprocessed$vsd_mat
+#rownames(x) <- ls_preprocessed$rna_all$Feature_gene_name
+result <- WGCNA::collapseRows(x,
+                           rowGroup=ls_preprocessed$rna_all$Feature_gene_name,
+                           rowID=rownames(x),
+                           method="function",
+                           methodFunction=sum)
+x2 <- data.frame(result$datETcollapsed)
+
+gene_sym_X <- pivot_longer(gene_sym, cols = 1:ncol(gene_sym))
+gene_sym_X$value <- as.character(gene_sym_X$value)
+k_i<- which(gene_sym_X$value == '')
+gene_sym_X<- gene_sym_X[-k_i,]
+
+x3 <- x2[top_genes,]
+x3 <- x3[gene_sym_X$value,]
+
+result <- WGCNA::collapseRows(x3,
+                           rowGroup=gene_sym_X$name,
+                           rowID=rownames(x3),
+                           method="function",
+                           methodFunction=mean)
+x4 <- data.frame(result$datETcollapsed)
+
+corr_pt <- Hmisc::rcorr(as.matrix(x4), type = 'spearman')
+
+Heatmap(corr_pt$r, name = "mat", 
+        #column_km = 3, 
+        #row_km = 3,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+# Hierarchical clustering
+d <- dist(corr_pt$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+#clustering
+k <- 4
+hc1 <- hclust(d, method = 'complete')
+hc2 <- hclust(d, method = 'average')
+hc3 <- hclust(d, method = 'mcquitty')
+hc4 <- hclust(d, method = 'ward.D')
+
+sub_grp1 <- cutree(hc1, k = k)
+sub_grp2 <- cutree(hc2, k = k)
+sub_grp3 <- cutree(hc3, k = k)
+sub_grp4 <- cutree(hc4, k = k)
+kmns <- kmeans(corr_pt$r, centers = k)
+clusters <- as.data.frame(cbind(Vantage_ID=names(sub_grp1), 
+                                hclust_com=sub_grp1, 
+                                hclust_ave=sub_grp2, 
+                                hclust_mq=sub_grp3, 
+                                hclust_w=sub_grp4, 
+                                k_means = kmns$cluster))
+
+ha = rowAnnotation(
+
+    hclust_com = as.factor(clusters$hclust_com),
+    hclust_ave = as.factor(clusters$hclust_ave),
+    hclust_mq = as.factor(clusters$hclust_mq),
+    hclust_w = as.factor(clusters$hclust_w),
+    k_means = as.factor(clusters$k_means),
+
+    simple_anno_size = unit(0.5, "cm")
+)
+
+Heatmap(corr_pt$r, name = "mat", 
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8), right_annotation = ha)
+
+
 ```
 
 ## Using top n genes
@@ -53,11 +399,13 @@ plot(hc1, cex = 0.6, hang = -1)
 n_genes <- 10000
 vsd_mat <- ls_preprocessed$vsd_mat
 variances <- apply(vsd_mat, 1, var)
+medians <- apply(vsd_mat, 1, median)
 top_genes <- data.frame(vsd_mat) %>%
   mutate(gene=rownames(.),
          symbol=ls_preprocessed$rna_all$Feature_gene_name,
-         variances = variances) %>%
-  arrange(desc(variances)) %>%
+         variances = variances,
+         medians = medians) %>%
+  arrange(desc(variances), desc(medians)) %>%
   dplyr::select(gene, symbol) %>%
   head(n_genes)
 vsd_mat5k<- vsd_mat[top_genes$gene,]
@@ -65,8 +413,6 @@ rownames(vsd_mat5k) <- top_genes$symbol
 
 corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
 Heatmap(corr_pt$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
         column_names_gp = gpar(fontsize = 8))
@@ -77,15 +423,19 @@ hc1 <- hclust(d)
 plot(hc1, cex = 0.6, hang = -1)
 ```
 
+
+
 ```{r}
 n_genes <- 5000
 vsd_mat <- ls_preprocessed$vsd_mat
 variances <- apply(vsd_mat, 1, var)
+medians <- apply(vsd_mat, 1, median)
 top_genes <- data.frame(vsd_mat) %>%
   mutate(gene=rownames(.),
          symbol=ls_preprocessed$rna_all$Feature_gene_name,
-         variances = variances) %>%
-  arrange(desc(variances)) %>%
+         variances = variances,
+         medians = medians) %>%
+  arrange(desc(variances), desc(medians)) %>%
   dplyr::select(gene, symbol) %>%
   head(n_genes)
 vsd_mat5k<- vsd_mat[top_genes$gene,]
@@ -93,8 +443,6 @@ rownames(vsd_mat5k) <- top_genes$symbol
 
 corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
 Heatmap(corr_pt$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
         column_names_gp = gpar(fontsize = 8))
@@ -109,11 +457,13 @@ plot(hc1, cex = 0.6, hang = -1)
 n_genes <- 1000
 vsd_mat <- ls_preprocessed$vsd_mat
 variances <- apply(vsd_mat, 1, var)
+medians <- apply(vsd_mat, 1, median)
 top_genes <- data.frame(vsd_mat) %>%
   mutate(gene=rownames(.),
          symbol=ls_preprocessed$rna_all$Feature_gene_name,
-         variances = variances) %>%
-  arrange(desc(variances)) %>%
+         variances = variances,
+         medians = medians) %>%
+  arrange(desc(variances), desc(medians)) %>%
   dplyr::select(gene, symbol) %>%
   head(n_genes)
 vsd_mat5k<- vsd_mat[top_genes$gene,]
@@ -121,8 +471,6 @@ rownames(vsd_mat5k) <- top_genes$symbol
 
 corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
 Heatmap(corr_pt$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
         column_names_gp = gpar(fontsize = 8))
@@ -137,11 +485,13 @@ plot(hc1, cex = 0.6, hang = -1)
 n_genes <- 500
 vsd_mat <- ls_preprocessed$vsd_mat
 variances <- apply(vsd_mat, 1, var)
+medians <- apply(vsd_mat, 1, median)
 top_genes <- data.frame(vsd_mat) %>%
   mutate(gene=rownames(.),
          symbol=ls_preprocessed$rna_all$Feature_gene_name,
-         variances = variances) %>%
-  arrange(desc(variances)) %>%
+         variances = variances,
+         medians = medians) %>%
+  arrange(desc(variances), desc(medians)) %>%
   dplyr::select(gene, symbol) %>%
   head(n_genes)
 vsd_mat5k<- vsd_mat[top_genes$gene,]
@@ -149,8 +499,6 @@ rownames(vsd_mat5k) <- top_genes$symbol
 
 corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
 Heatmap(corr_pt$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
         column_names_gp = gpar(fontsize = 8))
@@ -165,11 +513,13 @@ plot(hc1, cex = 0.6, hang = -1)
 n_genes <- 100
 vsd_mat <- ls_preprocessed$vsd_mat
 variances <- apply(vsd_mat, 1, var)
+medians <- apply(vsd_mat, 1, median)
 top_genes <- data.frame(vsd_mat) %>%
   mutate(gene=rownames(.),
          symbol=ls_preprocessed$rna_all$Feature_gene_name,
-         variances = variances) %>%
-  arrange(desc(variances)) %>%
+         variances = variances,
+         medians = medians) %>%
+  arrange(desc(variances), desc(medians)) %>%
   dplyr::select(gene, symbol) %>%
   head(n_genes)
 vsd_mat5k<- vsd_mat[top_genes$gene,]
@@ -177,16 +527,12 @@ rownames(vsd_mat5k) <- top_genes$symbol
 
 corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
 Heatmap(corr_pt$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
         column_names_gp = gpar(fontsize = 8))
 
 corr_genes <- Hmisc::rcorr(t(vsd_mat5k), type = 'spearman')
 Heatmap(corr_genes$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
         column_names_gp = gpar(fontsize = 8))
