@@ -1,29 +1,25 @@
 library(readr)
 library(dplyr)
 library(tidyr)
+source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
 
-# Load deconvolution data
-mcp_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/MCPcounter/mcp_dcv.txt", row.names=1)))
-qts_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/quanTIseq/qts_dcv.txt", row.names=1)))
-cbs_dcv <- read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/CIBERSORT/CIBERSORT.Output_Job8.txt", row.names=1)
-xcell_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/xCell/xCell_rnaseq_tpm_xCell_0746040120.txt", row.names=1)))
+# Load deconvolution data rna_cytof
 
-mcp_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/MCPcounter/mcp_fpkm_dcv.txt", row.names=1)))
-qts_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/quanTIseq/qts_fpkm_dcv.txt", row.names=1)))
-cbs_dcv <- read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/CIBERSORT/CIBERSORT.Output_Job9.txt", row.names=1)
-xcell_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/xCell/xCell_rnaseq_fpkm_xCell_1359041620.txt", row.names=1)))
+# TPM
+mcp_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_cytof/MCP/mcp_dcv.txt", row.names=1)))
+qts_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_cytof/QTS/qts_dcv.txt", row.names=1)))
+cbs_dcv <- read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_cytof/CBS/CIBERSORT.rna_cytof_tpm.txt", row.names=1)
+xcell_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_cytof/XCELL/xCell_rnaseq_tpm_xCell_1211060320.txt", row.names=1)))
 
-
-mcp_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/MCPcounter/mcp_fpkm_dcv_u.txt", row.names=1)))
-qts_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/quanTIseq/qts_fpkm_dcv_u.txt", row.names=1)))
-cbs_dcv <- read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/CIBERSORT/CIBERSORT.Output_Job10.txt", row.names=1)
-xcell_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/xCell/xCell_rnaseq_fpkm_u_xCell_0432041720.txt", row.names=1)))
-
-
+# FPKM
+mcp_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_cytof/MCP/mcp_fpkm_dcv.txt", row.names=1)))
+qts_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_cytof/QTS/qts_fpkm_dcv.txt", row.names=1)))
+cbs_dcv <- read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_cytof/CBS/CIBERSORT.rna_cytof_fpkm.txt", row.names=1)
+xcell_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_cytof/XCELL/xCell_rnaseq_fpkm_xCell_1151060320.txt", row.names=1)))
 
 
 # Load RNA seq data 
-load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData")
+ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData', correct_batch = T, correct_gender = T)
 
 # Load CyTOF data
 load("/Users/senosam/Documents/Massion_lab/CyTOF_summary/both/analysis/subsets/prcnts_by_pt.RData")
@@ -31,28 +27,14 @@ load("/Users/senosam/Documents/Massion_lab/CyTOF_summary/both/analysis/subsets/p
 prcnt_pt <- prcnt_pt %>%
   tibble::rownames_to_column('pt_ID') %>%
   mutate(., Epithelial = rowSums(prcnt_pt[,9:ncol(prcnt_pt)])) %>%
-  select(., Epithelial, everything()) %>%
-  select(., -colnames(prcnt_pt)[8:ncol(prcnt_pt)]) %>%
+  dplyr::select(., Epithelial, everything()) %>%
+  dplyr::select(., -colnames(prcnt_pt)[8:ncol(prcnt_pt)]) %>%
   tibble::column_to_rownames('pt_ID')
 
-
-# remove duplicates from rna
-dupl <- c('11817', '11840', '12889', '12890', '12929', '13034', '13155', '15002')
-unique_vntg <- p_all %>%
-  filter(., !(pt_ID %in% dupl &
-    grepl("R4163",Vantage_ID))) %>%
-  select(., Vantage_ID) %>%
+unique_pt <- ls_preprocessed$p_all %>%
+  filter(., Vantage_ID %in% rownames(mcp_dcv)) %>%
+  dplyr::select(., pt_ID) %>%
   pull()
-
-unique_pt <- p_all %>%
-  filter(., Vantage_ID %in% unique_vntg) %>%
-  select(., pt_ID) %>%
-  pull()
-
-mcp_dcv <- mcp_dcv[unique_vntg,]
-qts_dcv <- qts_dcv[unique_vntg,]
-cbs_dcv <- cbs_dcv[unique_vntg,]
-xcell_dcv <- xcell_dcv[unique_vntg,]
 
 # row names by pt id
 rownames(mcp_dcv) <- unique_pt
@@ -134,10 +116,8 @@ ref <- rbind(ref,ref,ref,ref)
 
 all_dt <- cbind(all_dt, 'ref'= ref$value)
 
-all_dt_1 <- all_dt[which(all_dt$batch =='1'),]
-all_dt_2 <- all_dt[which(all_dt$batch =='2'),]
 
-ggpubr::ggscatter(all_dt_2, x = "ref", y = "value",
+ggpubr::ggscatter(all_dt, x = "ref", y = "value",
           add = "reg.line", conf.int = F, combine = TRUE,
           cor.coef = TRUE, cor.method = "spearman", add.params = list(color = 'blue'),
           xlab = "CyTOF fraction", ylab = 'Estimated fraction') +
