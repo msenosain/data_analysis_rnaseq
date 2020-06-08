@@ -142,10 +142,3 @@ rownames(fpkm_dcv) <- fpkm_all$Feature_gene_name
 
 save(rna_all, fpkm_all, fpkm_dcv, fpkm_dcv_cbs, tpm_all, tpm_all_cbs, p_all, pData_rnaseq, file = 'rnaseq.RData')
 
-
-
-
-
-
-
-
