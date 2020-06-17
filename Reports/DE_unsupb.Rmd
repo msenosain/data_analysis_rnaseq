@@ -85,11 +85,7 @@ Heatmap(corr_pt$r, name = "mat",
         row_names_gp = gpar(fontsize = 8),
         column_names_gp = gpar(fontsize = 8), right_annotation = ha)
 
-```
 
-## Clustering
-
-```{r}
 p_all_cl <- ls_preprocessed$p_all
 p_all_cl <- p_all_cl %>% 
               inner_join(., clusters, "Vantage_ID") %>%
@@ -97,10 +93,18 @@ p_all_cl <- p_all_cl %>%
 
 ```
 
-# DE analysis
+
+## DE analysis
 
 ```{r}
-DE_res <- DE_analysis(ls_preprocessed, 
+k_12 <- which(p_all_cl$hclust_com %in% c('1', '2'))
+k_123 <- which(p_all_cl$hclust_com %in% c('1', '2', '3'))
+p_all_cl_12 <- p_all_cl
+p_all_cl_12$hclust_com[k_12] <- '12'
+p_all_cl_123 <- p_all_cl
+p_all_cl_123$hclust_com[k_123] <- '123'
+
+DE_res_1v2 <- DE_analysis(ls_preprocessed, 
            GeneBased=FALSE, 
            pDataBased=FALSE,
            NewCondition=TRUE,
@@ -110,78 +114,273 @@ DE_res <- DE_analysis(ls_preprocessed,
            reference = '1',
            correct_gender=TRUE)
 
+DE_res_3v1 <- DE_analysis(ls_preprocessed, 
+           GeneBased=FALSE, 
+           pDataBased=FALSE,
+           NewCondition=TRUE,
+           NewCondition_df = p_all_cl,
+           cond_nm='hclust_com',
+           two_levels=c('3','1'),
+           reference = '3',
+           correct_gender=TRUE)
+
+DE_res_3v2 <- DE_analysis(ls_preprocessed, 
+           GeneBased=FALSE, 
+           pDataBased=FALSE,
+           NewCondition=TRUE,
+           NewCondition_df = p_all_cl,
+           cond_nm='hclust_com',
+           two_levels=c('3','2'),
+           reference = '3',
+           correct_gender=TRUE)
+
+DE_res_3v12 <- DE_analysis(ls_preprocessed, 
+           GeneBased=FALSE, 
+           pDataBased=FALSE,
+           NewCondition=TRUE,
+           NewCondition_df = p_all_cl_12,
+           cond_nm='hclust_com',
+           two_levels=c('3','12'),
+           reference = '3',
+           correct_gender=TRUE)
+
+DE_res_4v123 <- DE_analysis(ls_preprocessed, 
+           GeneBased=FALSE, 
+           pDataBased=FALSE,
+           NewCondition=TRUE,
+           NewCondition_df = p_all_cl_123,
+           cond_nm='hclust_com',
+           two_levels=c('4','123'),
+           reference = '4',
+           correct_gender=TRUE)
+
+```
+
+```{r}
+dt <- DE_res_1v2$res_df
+
+pCutoff=0.05
+FCcutoff=2
+
+x <- dt %>%
+  filter(., abs(dt$log2FoldChange) >FCcutoff & 
+           dt$padj < pCutoff)
+
+x_up1 <- x[which(x$log2FoldChange>0),"symbol"]
+x_up2 <- x[which(x$log2FoldChange<0),"symbol"]
+
+x_up1
+x_up2
+
+```
+
+```{r}
+
+dt <- DE_res_3v1$res_df
+
+pCutoff=0.05
+FCcutoff=2
+
+x <- dt %>%
+  filter(., abs(dt$log2FoldChange) >FCcutoff & 
+           dt$padj < pCutoff)
+
+x_up3 <- x[which(x$log2FoldChange>0),"symbol"]
+x_up1 <- x[which(x$log2FoldChange<0),"symbol"]
+
+x_up3
+x_up1
+
+```
+
+```{r}
+
+dt <- DE_res_3v2$res_df
+
+pCutoff=0.05
+FCcutoff=1.5
+
+x <- dt %>%
+  filter(., abs(dt$log2FoldChange) >FCcutoff & 
+           dt$padj < pCutoff)
+
+x_up3 <- x[which(x$log2FoldChange>0),"symbol"]
+x_up2 <- x[which(x$log2FoldChange<0),"symbol"]
+
+x_up3
+x_up2
+
 ```
 
 ## DE results
 ```{r}
-heatmap_200(DE_res$res_df, DE_res$vsd_mat_sym, DE_res$meta_data, DE_res$pData_rnaseq)
-volcano_plot(DE_res$res_df, gene=NULL, p_title='Clusters: 1 vs 2')
+heatmap_200(DE_res_1v2$res_df, DE_res_1v2$vsd_mat_sym, DE_res_1v2$meta_data, DE_res_1v2$pData_rnaseq)
+volcano_plot(DE_res_1v2$res_df, gene=NULL, p_title='Clusters: 1 vs 2')
+
+heatmap_200(DE_res_3v1$res_df, DE_res_3v1$vsd_mat_sym, DE_res_3v1$meta_data, DE_res_3v1$pData_rnaseq)
+volcano_plot(DE_res_3v1$res_df, gene=NULL, p_title='Clusters: 3 vs 1')
+
+heatmap_200(DE_res_3v2$res_df, DE_res_3v2$vsd_mat_sym, DE_res_3v2$meta_data, DE_res_3v2$pData_rnaseq)
+volcano_plot(DE_res_3v2$res_df, gene=NULL, p_title='Clusters: 3 vs 2')
+
+heatmap_200(DE_res_3v12$res_df, DE_res_3v12$vsd_mat_sym, DE_res_3v12$meta_data, DE_res_3v12$pData_rnaseq)
+volcano_plot(DE_res_3v12$res_df, gene=NULL, p_title='Clusters: 3 vs 1+2')
+
+heatmap_200(DE_res_4v123$res_df, DE_res_4v123$vsd_mat_sym, DE_res_4v123$meta_data, DE_res_4v123$pData_rnaseq)
+volcano_plot(DE_res_4v123$res_df, gene=NULL, p_title='Clusters: 4 vs 1+2+3')
 
 ```
 
 ## Pathway enrichment analysis fGSEA
-CANARY Good prognosis (G) is the reference. When sample is P, pathways shown below are up- or down- regulated
 ```{r}
-fgsea_res <- fgsea_analysis(DE_res)
+fgsea_res_1v2 <- fgsea_analysis(DE_res_1v2)
+fgsea_res_3v1 <- fgsea_analysis(DE_res_3v1)
+fgsea_res_3v2 <- fgsea_analysis(DE_res_3v2)
+fgsea_res_3v12 <- fgsea_analysis(DE_res_3v12)
+fgsea_res_4v123 <- fgsea_analysis(DE_res_4v123)
 
-fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='CANARY: G vs P')
+```
+
+### Clusters: 1 vs 2
+```{r}
+fgsea_res <- fgsea_res_1v2
+cond_nm <- 'Clusters: 1 vs 2'
+fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name= cond_nm)
+
+```
+
+### Clusters: 3 vs 1
+```{r}
+fgsea_res <- fgsea_res_3v1
+cond_nm <- 'Clusters: 3 vs 1'
+fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name= cond_nm)
+
+```
+
+### Clusters: 3 vs 1
+```{r}
+fgsea_res <- fgsea_res_3v2
+cond_nm <- 'Clusters: 3 vs 2'
+fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name= cond_nm)
+
+```
+
+### Clusters: 3 vs 1+2
+```{r}
+fgsea_res <- fgsea_res_3v12
+cond_nm <- 'Clusters: 3 vs 1+2'
+fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name= cond_nm)
+
+```
+
+### Clusters: 4 vs 1+2+3
+```{r}
+fgsea_res <- fgsea_res_4v123
+cond_nm <- 'Clusters: 4 vs 1+2+3'
+fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name= cond_nm)
+fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name= cond_nm)
+
 ```
 
 
-
-## Selecting top genes with Clust
+## Exploring association with clinical variables 
 
 ```{r}
-gene_ID <-read.delim("~/Documents/Massion_lab/RNASeq_summary/Results_02_Jun_20_1/Clusters_Objects.tsv")[-1,]
-top_genes <-  sort(as.character(unique(as.vector(as.matrix(gene_ID)))))[-1]
+label <- ls_preprocessed$pData_rnaseq
 
-corr_pt <- Hmisc::rcorr(ls_preprocessed$vsd_mat[top_genes,], type = 'spearman')
-Heatmap(corr_pt$r, name = "mat", 
-        #column_km = 3, 
-        #row_km = 3,
-        heatmap_legend_param = list(color_bar = "continuous"), 
-        row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8))
 
-# Hierarchical clustering
-d <- dist(corr_pt$r)
-hc1 <- hclust(d)
-plot(hc1, cex = 0.6, hang = -1)
-
-#clustering
-k <- 3
-hc1 <- hclust(d, method = 'complete')
-hc2 <- hclust(d, method = 'average')
-hc3 <- hclust(d, method = 'mcquitty')
-hc4 <- hclust(d, method = 'ward.D')
-
-sub_grp1 <- cutree(hc1, k = k)
-sub_grp2 <- cutree(hc2, k = k)
-sub_grp3 <- cutree(hc3, k = k)
-sub_grp4 <- cutree(hc4, k = k)
-kmns <- kmeans(corr_pt$r, centers = k)
-clusters <- as.data.frame(cbind(Vantage_ID=names(sub_grp1), 
-                                hclust_com=sub_grp1, 
-                                hclust_ave=sub_grp2, 
-                                hclust_mq=sub_grp3, 
-                                hclust_w=sub_grp4, 
-                                k_means = kmns$cluster))
-
-ha = rowAnnotation(
-
+ha1 = rowAnnotation(
     hclust_com = as.factor(clusters$hclust_com),
-    hclust_ave = as.factor(clusters$hclust_ave),
-    hclust_mq = as.factor(clusters$hclust_mq),
-    hclust_w = as.factor(clusters$hclust_w),
-    k_means = as.factor(clusters$k_means),
+    canary = as.factor(label$CANARY), #
+    age = label$Age_at_collection,
+    gender = as.factor(label$Gender),
+    race = as.factor(label$Race),
+    ethnicity = as.factor(label$Ethnicity),
+    BMI = label$BMI,
+    smoking = as.factor(label$Smoking_Status),
+    Pack_Years = label$Pack_Years,
+
+    simple_anno_size = unit(0.5, "cm")
+)
+
+ha2 = rowAnnotation(
+    
+    hclust_com = as.factor(clusters$hclust_com),
+    Age_Started = label$Age_Started,
+    Age_Quit = label$Age_Quit,
+    Exposure = as.factor(label$Exposure),
+    prior_cancer = as.factor(label$Prior_Cancer),
+    prior_cancer_type = as.factor(label$Prior_Cancer_Type), #*
+    family_cancer = as.factor(label$Family_History_Cancer_Type),
+    Chest_CT_Size = label$Chest_CT_Size,
+    Chest_CT_Location = as.factor(label$Chest_CT_Location),
+
+    simple_anno_size = unit(0.5, "cm")
+)
+
+ha3 = rowAnnotation(
+    
+    hclust_com = as.factor(clusters$hclust_com),
+    Chest_CT_Nodule_Density = as.factor(label$Chest_CT_Nodule_Density), #
+    CT_Nodule_Margination = as.factor(label$CT_Nodule_Margination),
+    PET_Lesion = as.factor(label$PET_Lesion),
+    fev1 = as.numeric(label$FEV1.pred),
+    eighth_ed_stage = as.factor(label$X8th_ed_path_stage),
+    simplified_stage = as.factor(label$Stages_simplified),
+    Path_Nodule_Size_cm = label$Path_Nodule_Size_cm,
+    life_status = as.factor(label$Living_Status),
+
+    simple_anno_size = unit(0.5, "cm")
+)
+
+ha4 = rowAnnotation(
+    
+    hclust_com = as.factor(clusters$hclust_com),
+    Death_st = as.factor(label$Death_st),
+    Recurrence_st = as.factor(label$Recurrence_st),
+    Progression_st = as.factor(label$Progression_st),
+    DRP_st = as.factor(label$DRP_st),
+    Hist_pred = as.factor(label$Hist_predominant),
+    Hist_sec = as.factor(label$Hist_other_patterns),
 
     simple_anno_size = unit(0.5, "cm")
 )
@@ -189,257 +388,43 @@ ha = rowAnnotation(
 Heatmap(corr_pt$r, name = "mat", 
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8), right_annotation = ha)
-
-
-```
-
-
-
-## Clustering
-
-```{r}
-p_all_cl <- ls_preprocessed$p_all
-p_all_cl <- p_all_cl %>% 
-              inner_join(., clusters, "Vantage_ID") %>%
-              mutate_all(as.character)
-
-ls_preprocessed$rna_all <- ls_preprocessed$rna_all[which(ls_preprocessed$rna_all$Feature %in% top_genes),]
-ls_preprocessed$counts_all <- ls_preprocessed$counts_all[top_genes,]
-ls_preprocessed$vsd_mat <- ls_preprocessed$vsd_mat[top_genes,]
-
-```
-
-# DE analysis
-
-```{r}
-DE_res <- DE_analysis(ls_preprocessed, 
-           GeneBased=FALSE, 
-           pDataBased=FALSE,
-           NewCondition=TRUE,
-           NewCondition_df = p_all_cl,
-           cond_nm='k_means',
-           two_levels=c('2','3'),
-           reference = '2',
-           correct_gender=TRUE)
-
-```
-
-## DE results
-```{r}
-heatmap_200(DE_res$res_df, DE_res$vsd_mat_sym, DE_res$meta_data, DE_res$pData_rnaseq)
-volcano_plot(DE_res$res_df, gene=NULL, p_title='Clusters: 2 vs 3')
-
-```
-
-## Pathway enrichment analysis fGSEA
-CANARY Good prognosis (G) is the reference. When sample is P, pathways shown below are up- or down- regulated
-```{r}
-fgsea_res <- fgsea_analysis(DE_res)
-
-fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='CANARY: G vs P')
-fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='CANARY: G vs P')
-```
-
-
-```{r}
-names(ls_preprocessed)
-
-n_genes <- 500
-vsd_mat <- ls_preprocessed$vsd_mat
-variances <- apply(vsd_mat, 1, var)
-top_genes <- data.frame(vsd_mat) %>%
-  mutate(gene=rownames(.),
-         symbol=ls_preprocessed$rna_all$Feature_gene_name,
-         variances = variances) %>%
-  arrange(desc(variances)) %>%
-  dplyr::select(gene, symbol) %>%
-  head(n_genes)
-vsd_mat5k<- vsd_mat[top_genes$gene,]
-rownames(vsd_mat5k) <- top_genes$symbol
-
-idx <- grep('HLA-DRB1', ls_preprocessed$rna_all$Feature_gene_name)
-hla_sym <- as.character(ls_preprocessed$rna_all$Feature_gene_name[idx])
-
-vsd_mat5k <- vsd_mat5k[which(rownames(vsd_mat5k)%in% hla_sym),]
-dim(vsd_mat5k)
-
-
-corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
-# Hierarchical clustering
-d <- dist(corr_pt$r)
-hc1 <- hclust(d)
-plot(hc1, cex = 0.6, hang = -1)
-
-corr_gn <- Hmisc::rcorr(t(vsd_mat5k), type = 'spearman')
-# Hierarchical clustering
-d <- dist(corr_gn$r)
-hc1 <- hclust(d)
-plot(hc1, cex = 0.6, hang = -1)
+        column_names_gp = gpar(fontsize = 8), right_annotation = ha1)
 
 Heatmap(corr_pt$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8))
+        column_names_gp = gpar(fontsize = 8), right_annotation = ha2)
 
-Heatmap(corr_gn$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
+Heatmap(corr_pt$r, name = "mat", 
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8))
+        column_names_gp = gpar(fontsize = 8), right_annotation = ha3)
 
-Heatmap(vsd_mat5k, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
+Heatmap(corr_pt$r, name = "mat", 
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8))
+        column_names_gp = gpar(fontsize = 8), right_annotation = ha4)
 
 ```
 
 
 ```{r}
-names(ls_preprocessed)
 
-n_genes <- 5000
-vsd_mat <- ls_preprocessed$vsd_mat
-variances <- apply(vsd_mat, 1, var)
-top_genes <- data.frame(vsd_mat) %>%
-  mutate(gene=rownames(.),
-         symbol=ls_preprocessed$rna_all$Feature_gene_name,
-         variances = variances) %>%
-  arrange(desc(variances)) %>%
-  dplyr::select(gene, symbol) %>%
-  head(n_genes)
-vsd_mat5k<- vsd_mat[top_genes$gene,]
-rownames(vsd_mat5k) <- top_genes$symbol
-
-idx <- grep('HLA-DR', ls_preprocessed$rna_all$Feature_gene_name)
-hla_id <- as.character(ls_preprocessed$rna_all$Feature[idx])
-hla_sym <- as.character(ls_preprocessed$rna_all$Feature_gene_name[idx])
-
-k <- which(hla_id %in% top_genes$gene)
-as_tibble(cbind(hla_id[k],hla_sym[k]))
-
-vsd_mat5k <- vsd_mat5k[which(rownames(vsd_mat5k)%in% hla_sym),]
-dim(vsd_mat5k)
-
-
-
-
-corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
-# Hierarchical clustering
-d <- dist(corr_pt$r)
-hc1 <- hclust(d)
-plot(hc1, cex = 0.6, hang = -1)
-sub_grp <- cutree(hc1, k = 2)
-clusters <- as.data.frame(cbind(Vantage_ID=names(sub_grp), Cluster=sub_grp))
-
-corr_gn <- Hmisc::rcorr(t(vsd_mat5k), type = 'spearman')
-# Hierarchical clustering
-d <- dist(corr_gn$r)
-hc1 <- hclust(d)
-plot(hc1, cex = 0.6, hang = -1)
-
-set.seed(455)
-Heatmap(corr_pt$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
-        heatmap_legend_param = list(color_bar = "continuous"), 
-        row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8))
-
-Heatmap(corr_gn$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
-        heatmap_legend_param = list(color_bar = "continuous"), 
-        row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8))
-
-Heatmap(vsd_mat5k, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
-        heatmap_legend_param = list(color_bar = "continuous"), 
-        row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8))
-
-
+save(ls_preprocessed, 
+     corr_pt, 
+     clusters, 
+     DE_res_1v2, 
+     DE_res_3v1, 
+     DE_res_3v2, 
+     DE_res_3v12, 
+     DE_res_4v123, 
+     fgsea_res_1v2,
+     fgsea_res_3v1,
+     fgsea_res_3v2,
+     fgsea_res_3v12,
+     fgsea_res_4v123,
+     p_all_cl,
+     p_all_cl_12,
+     p_all_cl_123, file = 'DE_unsupb.RData')
 
 ```
-
-
-```{r}
-names(ls_preprocessed)
-
-n_genes <- 5000
-vsd_mat <- ls_preprocessed$vsd_mat
-variances <- apply(vsd_mat, 1, var)
-top_genes <- data.frame(vsd_mat) %>%
-  mutate(gene=rownames(.),
-         symbol=ls_preprocessed$rna_all$Feature_gene_name,
-         variances = variances) %>%
-  arrange(desc(variances)) %>%
-  dplyr::select(gene, symbol) %>%
-  head(n_genes)
-vsd_mat5k<- vsd_mat[top_genes$gene,]
-rownames(vsd_mat5k) <- top_genes$gene
-
-idx <- grep('HLA-DR', ls_preprocessed$rna_all$Feature_gene_name)
-hla_id <- as.character(ls_preprocessed$rna_all$Feature[idx])
-hla_sym <- as.character(ls_preprocessed$rna_all$Feature_gene_name[idx])
-
-k <- which(hla_id %in% top_genes$gene)
-as_tibble(cbind(hla_id[k],hla_sym[k]))
-
-vsd_mat5k <- vsd_mat5k[which(rownames(vsd_mat5k)%in% hla_id),]
-dim(vsd_mat5k)
-
-
-
-
-corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
-# Hierarchical clustering
-d <- dist(corr_pt$r)
-hc1 <- hclust(d)
-plot(hc1, cex = 0.6, hang = -1)
-
-corr_gn <- Hmisc::rcorr(t(vsd_mat5k), type = 'spearman')
-# Hierarchical clustering
-d <- dist(corr_gn$r)
-hc1 <- hclust(d)
-plot(hc1, cex = 0.6, hang = -1)
-
-set.seed(455)
-Heatmap(corr_pt$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
-        heatmap_legend_param = list(color_bar = "continuous"), 
-        row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8))
-
-Heatmap(corr_gn$r, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
-        heatmap_legend_param = list(color_bar = "continuous"), 
-        row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8))
-
-Heatmap(vsd_mat5k, name = "mat", 
-        column_km = 2, 
-        row_km = 2,
-        heatmap_legend_param = list(color_bar = "continuous"), 
-        row_names_gp = gpar(fontsize = 8),
-        column_names_gp = gpar(fontsize = 8))
-
-```
-

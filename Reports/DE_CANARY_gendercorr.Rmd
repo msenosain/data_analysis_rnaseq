@@ -47,6 +47,23 @@ volcano_plot(DE_res$res_df, gene=NULL, p_title='CANARY: G vs P')
 
 ```
 
+```{r}
+pCutoff=0.05
+FCcutoff=1.5
+
+x <- DE_res$res_df %>%
+  filter(., abs(DE_res$res_df$log2FoldChange) >FCcutoff & 
+           DE_res$res_df$padj < pCutoff)
+x
+
+x_upG <- x[which(x$log2FoldChange>0),"symbol"]
+x_upP <- x[which(x$log2FoldChange<0),"symbol"]
+
+x_upG
+
+x_upP
+```
+
 ## Pathway enrichment analysis fGSEA
 CANARY Good prognosis (G) is the reference. When sample is P, pathways shown below are up- or down- regulated
 ```{r}

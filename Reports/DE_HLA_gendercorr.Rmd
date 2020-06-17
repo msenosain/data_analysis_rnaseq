@@ -138,3 +138,207 @@ fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='HLA-
 fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='HLA-DRB1 low vs high')
 fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='HLA-DRB1 low vs high')
 ```
+
+
+
+
+
+
+
+
+
+
+```{r}
+names(ls_preprocessed)
+
+n_genes <- 500
+vsd_mat <- ls_preprocessed$vsd_mat
+variances <- apply(vsd_mat, 1, var)
+top_genes <- data.frame(vsd_mat) %>%
+  mutate(gene=rownames(.),
+         symbol=ls_preprocessed$rna_all$Feature_gene_name,
+         variances = variances) %>%
+  arrange(desc(variances)) %>%
+  dplyr::select(gene, symbol) %>%
+  head(n_genes)
+vsd_mat5k<- vsd_mat[top_genes$gene,]
+rownames(vsd_mat5k) <- top_genes$symbol
+
+idx <- grep('HLA-DRB1', ls_preprocessed$rna_all$Feature_gene_name)
+hla_sym <- as.character(ls_preprocessed$rna_all$Feature_gene_name[idx])
+
+vsd_mat5k <- vsd_mat5k[which(rownames(vsd_mat5k)%in% hla_sym),]
+dim(vsd_mat5k)
+
+
+corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
+# Hierarchical clustering
+d <- dist(corr_pt$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+corr_gn <- Hmisc::rcorr(t(vsd_mat5k), type = 'spearman')
+# Hierarchical clustering
+d <- dist(corr_gn$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+Heatmap(corr_pt$r, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+Heatmap(corr_gn$r, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+Heatmap(vsd_mat5k, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+```
+
+
+```{r}
+names(ls_preprocessed)
+
+n_genes <- 5000
+vsd_mat <- ls_preprocessed$vsd_mat
+variances <- apply(vsd_mat, 1, var)
+top_genes <- data.frame(vsd_mat) %>%
+  mutate(gene=rownames(.),
+         symbol=ls_preprocessed$rna_all$Feature_gene_name,
+         variances = variances) %>%
+  arrange(desc(variances)) %>%
+  dplyr::select(gene, symbol) %>%
+  head(n_genes)
+vsd_mat5k<- vsd_mat[top_genes$gene,]
+rownames(vsd_mat5k) <- top_genes$symbol
+
+idx <- grep('HLA-DR', ls_preprocessed$rna_all$Feature_gene_name)
+hla_id <- as.character(ls_preprocessed$rna_all$Feature[idx])
+hla_sym <- as.character(ls_preprocessed$rna_all$Feature_gene_name[idx])
+
+k <- which(hla_id %in% top_genes$gene)
+as_tibble(cbind(hla_id[k],hla_sym[k]))
+
+vsd_mat5k <- vsd_mat5k[which(rownames(vsd_mat5k)%in% hla_sym),]
+dim(vsd_mat5k)
+
+
+
+
+corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
+# Hierarchical clustering
+d <- dist(corr_pt$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+sub_grp <- cutree(hc1, k = 2)
+clusters <- as.data.frame(cbind(Vantage_ID=names(sub_grp), Cluster=sub_grp))
+
+corr_gn <- Hmisc::rcorr(t(vsd_mat5k), type = 'spearman')
+# Hierarchical clustering
+d <- dist(corr_gn$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+set.seed(455)
+Heatmap(corr_pt$r, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+Heatmap(corr_gn$r, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+Heatmap(vsd_mat5k, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+
+
+```
+
+
+```{r}
+names(ls_preprocessed)
+
+n_genes <- 5000
+vsd_mat <- ls_preprocessed$vsd_mat
+variances <- apply(vsd_mat, 1, var)
+top_genes <- data.frame(vsd_mat) %>%
+  mutate(gene=rownames(.),
+         symbol=ls_preprocessed$rna_all$Feature_gene_name,
+         variances = variances) %>%
+  arrange(desc(variances)) %>%
+  dplyr::select(gene, symbol) %>%
+  head(n_genes)
+vsd_mat5k<- vsd_mat[top_genes$gene,]
+rownames(vsd_mat5k) <- top_genes$gene
+
+idx <- grep('HLA-DR', ls_preprocessed$rna_all$Feature_gene_name)
+hla_id <- as.character(ls_preprocessed$rna_all$Feature[idx])
+hla_sym <- as.character(ls_preprocessed$rna_all$Feature_gene_name[idx])
+
+k <- which(hla_id %in% top_genes$gene)
+as_tibble(cbind(hla_id[k],hla_sym[k]))
+
+vsd_mat5k <- vsd_mat5k[which(rownames(vsd_mat5k)%in% hla_id),]
+dim(vsd_mat5k)
+
+
+
+
+corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
+# Hierarchical clustering
+d <- dist(corr_pt$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+corr_gn <- Hmisc::rcorr(t(vsd_mat5k), type = 'spearman')
+# Hierarchical clustering
+d <- dist(corr_gn$r)
+hc1 <- hclust(d)
+plot(hc1, cex = 0.6, hang = -1)
+
+set.seed(455)
+Heatmap(corr_pt$r, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+Heatmap(corr_gn$r, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+Heatmap(vsd_mat5k, name = "mat", 
+        column_km = 2, 
+        row_km = 2,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+```
+
