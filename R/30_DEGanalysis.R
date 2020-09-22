@@ -19,7 +19,8 @@ environment_set <- function(){
 
 preprocess_rna <- function(path_rnaseq, 
     correct_batch=TRUE, 
-    correct_gender = FALSE){
+    correct_gender = FALSE,
+    lowvargenesrm = TRUE){
     # Load data
     load(path_rnaseq)
 
@@ -44,11 +45,14 @@ preprocess_rna <- function(path_rnaseq,
     pData_rnaseq <- pData_rnaseq[match(p_all$pt_ID, pData_rnaseq$pt_ID),]
 
     # Remove low variance genes from counts
-    variances <- apply(rna_all[, 8:ncol(rna_all)], 1, var)
-    sdv <- apply(rna_all[, 8:ncol(rna_all)], 1, sd)
-    q1 <- quantile(variances, na.rm = T)["25%"]
-    idx <- which(is.na(variances) | variances <= q1 | sdv == 0)
-    rna_all <- rna_all[-idx, ]
+    if(lowvargenesrm){
+        variances <- apply(rna_all[, 8:ncol(rna_all)], 1, var)
+        sdv <- apply(rna_all[, 8:ncol(rna_all)], 1, sd)
+        q1 <- quantile(variances, na.rm = T)["25%"]
+        idx <- which(is.na(variances) | variances <= q1 | sdv == 0)
+        rna_all <- rna_all[-idx, ]
+    }
+    
     counts_all <- rna_all[, 8:ncol(rna_all)]
     rownames(counts_all) <- rna_all$Feature
 
@@ -362,8 +366,7 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
 
         curated_pathways <- fgsea_res %>%
             dplyr::slice(1:max_pathways)
-        
-        print(knitr::kable(curated_pathways))
+        curated_pathways['leadingEdge'] <- NULL
         print(ggplot(curated_pathways, aes(reorder(pathway, NES), NES)) +
             geom_col(aes(fill = state), width = 0.5, color = "black") +
             scale_size_manual(values = c(0, 1), guide = "none") +
@@ -377,5 +380,7 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
             ) +
             theme_bw() +
             scale_fill_manual(values = color_levels(curated_pathways)))
+
+        curated_pathways
 }
 
