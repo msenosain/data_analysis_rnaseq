@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(igraph)
 source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
 environment_set()
 ```
@@ -31,6 +32,14 @@ print(ls_preprocessed$pbatch_af)
 print(ls_preprocessed$pgender_af)
 ```
 
+## Varians and Median Histograms
+
+```{r}
+vsd_mat <- ls_preprocessed$vsd_mat
+variances <- apply(vsd_mat, 1, var)
+medians <- apply(vsd_mat, 1, median)
+meanss <- apply(vsd_mat, 1, mean)
+```
 
 ## Using all genes
 
@@ -93,6 +102,43 @@ p_all_cl <- p_all_cl %>%
 
 ```
 
+```{r}
+vsd_mat <- ls_preprocessed$vsd_mat
+variances <- apply(vsd_mat, 1, var)
+n_genes <- length(which(variances > 0.5))
+top_genes <- data.frame(vsd_mat) %>%
+   mutate(gene=rownames(.),
+          symbol=ls_preprocessed$rna_all$Feature_gene_name,
+          variances = variances) %>%
+   arrange(desc(variances)) %>%
+   dplyr::select(gene, symbol) %>%
+   head(n_genes)
+vsd_mat5k<- vsd_mat[top_genes$gene,]
+rownames(vsd_mat5k) <- top_genes$symbol
+
+corr_pt <- Hmisc::rcorr(vsd_mat5k, type = 'spearman')
+
+Heatmap(corr_pt$r, name = "mat", 
+        #column_km = 3, 
+        #row_km = 3,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+
+```
+
+```{r}
+corr_mat <- corr_pt$r
+corr_mat[which(corr_mat==1)]<- 0
+corr_mat <- scale(corr_mat, center = F)
+hist(corr_mat)
+k<- which(corr_mat<1)
+corr_mat[k] <- 0
+corr_mat[-k] <- 1
+g <- graph.adjacency(corr_mat, mode = 'undirected')
+plot(g)
+
+```
 
 ## DE analysis
 

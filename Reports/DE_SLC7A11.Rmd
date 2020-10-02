@@ -1,19 +1,21 @@
 ---
 title: "DE SLC7A11"
 author: "Mafe Senosain"
-date: "5/6/2020"
+date: "9/15/2020"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+setwd("~/Documents/Massion_lab/RNASeq_summary")
 source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
 environment_set()
+library("knitr")
 ```
 
 # Pre-processing of the data
 ```{r}
-ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData', correct_batch = T, correct_gender = F)
+ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData', correct_batch = T, correct_gender = T)
 ```
 
 # Exploring data
@@ -34,8 +36,8 @@ DE_res <- DE_analysis(ls_preprocessed,
            pDataBased=FALSE,
            NewCondition=FALSE,
            cond_nm='ENSG00000151012.9',
-           reference = 'low', # low, alive
-           correct_gender=FALSE,
+           reference = 'low', 
+           correct_gender=TRUE,
            extremes_only=TRUE)
 
 
@@ -49,9 +51,16 @@ x <- DE_res$res_df %>%
 rownames(x) <- make.names(x$symbol, unique = T)
 k <- c('ENSG00000250033.1', 'ENSG00000151012.9')
 x <- x[-which(x$gene %in%k),]
-head(x, 10)
-volcano_plot(x, gene=NULL, p_title='SLC7A11')
+#head(x, 10)
+vp <- volcano_plot(x, gene=NULL, p_title='SLC7A11', pCutoff=0.001, FCcutoff=1.5)
 
+```
+
+### List of genes differentially expressed (-1.5 > fold change > 1.5, pval<0.001)
+```{r}
+vp_tb <- vp$data[which(vp$data$Sig == 'FC_P'),]
+rownames(vp_tb) <- c(1:nrow(vp_tb))
+kable(vp_tb)
 ```
 
 ## Pathway enrichment analysis fGSEA
@@ -59,13 +68,22 @@ Low SLC7A11 is the reference. When SLC7A11 is high, pathways shown below are up-
 ```{r}
 fgsea_res <- fgsea_analysis(DE_res)
 
-fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='SLC7A11 low vs high')
-fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='SLC7A11 low vs high')
-fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='SLC7A11 low vs high')
-fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='SLC7A11 low vs high')
-fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='SLC7A11 low vs high')
-fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='SLC7A11 low vs high')
-fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='SLC7A11 low vs high')
-fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='SLC7A11 low vs high')
-fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='SLC7A11 low vs high')
+fgp <- fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='SLC7A11 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='SLC7A11 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='SLC7A11 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='SLC7A11 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='SLC7A11 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='SLC7A11 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='SLC7A11 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='SLC7A11 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='SLC7A11 low vs high')
+kable(fgp)
 ```

@@ -1,0 +1,90 @@
+---
+title: "DE TRPA1"
+author: "Mafe Senosain"
+date: "9/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("~/Documents/Massion_lab/RNASeq_summary")
+source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
+environment_set()
+library("knitr")
+```
+
+# Pre-processing of the data
+```{r}
+ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData', correct_batch = T, correct_gender = T)
+```
+
+# Exploring data
+
+## Batch effect correction
+```{r}
+print(ls_preprocessed$pbatch_bf)
+print(ls_preprocessed$pgender_bf)
+print(ls_preprocessed$pbatch_af)
+print(ls_preprocessed$pgender_af)
+```
+
+# DE analysis
+
+```{r}
+gn <- as.character(ls_preprocessed$rna_all$Feature[which(ls_preprocessed$rna_all$Feature_gene_name =='TRPA1')])
+DE_res <- DE_analysis(ls_preprocessed, 
+           GeneBased=TRUE, 
+           pDataBased=FALSE,
+           NewCondition=FALSE,
+           cond_nm=gn,
+           reference = 'low', 
+           correct_gender=TRUE,
+           extremes_only=TRUE)
+
+
+```
+
+## DE results
+```{r}
+heatmap_200(DE_res$res_df, DE_res$vsd_mat_sym, DE_res$meta_data, DE_res$pData_rnaseq)
+x <- DE_res$res_df %>%
+  arrange(desc(abs(log2FoldChange)))
+rownames(x) <- make.names(x$symbol, unique = T)
+k <- gn
+x <- x[-which(x$gene %in%k),]
+#head(x, 10)
+vp <- volcano_plot(x, gene=NULL, p_title='TRPA1', pCutoff=0.001, FCcutoff=1.5)
+
+```
+
+### List of genes differentially expressed (-1.5 > fold change > 1.5, pval<0.001)
+```{r}
+vp_tb <- vp$data[which(vp$data$Sig == 'FC_P'),]
+rownames(vp_tb) <- c(1:nrow(vp_tb))
+kable(vp_tb)
+```
+
+## Pathway enrichment analysis fGSEA
+Low TRPA1 is the reference. When TRPA1 is high, pathways shown below are up- or down- regulated
+```{r}
+fgsea_res <- fgsea_analysis(DE_res)
+
+fgp <- fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='TRPA1 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='TRPA1 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='TRPA1 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='TRPA1 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='TRPA1 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='TRPA1 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='TRPA1 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='TRPA1 low vs high')
+kable(fgp)
+fgp <- fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='TRPA1 low vs high')
+kable(fgp)
+```

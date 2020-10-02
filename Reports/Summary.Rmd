@@ -1,0 +1,271 @@
+---
+title: "Summary of RNA Seq dataset"
+author: "Mafe Senosain"
+date: "`r Sys.Date()`"
+output:
+    html_document:
+        toc: true
+        toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
+load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData")
+environment_set()
+```
+
+# Pre-processing of the data
+```{r}
+ls_preprocessed <- preprocess_rna(path_rnaseq = '/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData', correct_batch = T, correct_gender = T)
+k <- which(p_all$Vantage_ID %in% colnames(ls_preprocessed$vsd_mat))
+p_all <- p_all[k,]
+pData_rnaseq <- pData_rnaseq[k,]
+CDE_TMA36 <- read.csv(file = '/Users/senosam/Documents/Massion_lab/CyTOF_summary/CDE_TMA36_2020FEB25_SA.csv')
+pData_rnaseq <- CDE_TMA36[match(pData_rnaseq$pt_ID, CDE_TMA36$pt_ID),]
+```
+
+# Exploring data
+
+## Batch effect correction
+```{r}
+print(ls_preprocessed$pbatch_bf)
+print(ls_preprocessed$pgender_bf)
+print(ls_preprocessed$pbatch_af)
+print(ls_preprocessed$pgender_af)
+```
+
+## Varians and Median Histograms
+
+```{r}
+vsd_mat <- ls_preprocessed$vsd_mat
+variances <- apply(vsd_mat, 1, var)
+medians <- apply(vsd_mat, 1, median)
+meanss <- apply(vsd_mat, 1, mean)
+
+hist(variances, breaks = 200)
+hist(medians, breaks = 200)
+hist(meanss, breaks = 200)
+```
+
+## Top variant genes
+
+```{r}
+vsd_mat <- ls_preprocessed$vsd_mat
+variances <- apply(vsd_mat, 1, var)
+n_genes <- length(which(variances > 0.5))
+#n_genes <- 200
+top_genes <- data.frame(vsd_mat) %>%
+   mutate(gene=rownames(.),
+          symbol=ls_preprocessed$rna_all$Feature_gene_name,
+          variances = variances) %>%
+   arrange(desc(variances)) %>%
+   dplyr::select(gene, symbol) %>%
+   head(n_genes)
+vsd_matTOP<- vsd_mat[top_genes$gene,]
+vsd_matTOP_ENSEMBL <- vsd_matTOP
+rownames(vsd_matTOP) <- top_genes$symbol
+
+```
+
+```{r echo=FALSE, fig.width = 10, fig.height = 8}
+Heatmap(t(scale(t(vsd_matTOP))), show_row_dend = F, name = "Z-score",
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8), show_row_names = F)
+```
+
+```{r echo=FALSE, fig.width = 10, fig.height = 8}
+corr_pt <- Hmisc::rcorr(vsd_matTOP, type = 'spearman')
+
+Heatmap(corr_pt$r, name = "mat", 
+        #column_km = 3, 
+        #row_km = 3,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+```
+
+```{r echo=FALSE, fig.width = 10, fig.height = 8}
+mhcii <- grep('HLA-D',top_genes$symbol)
+Heatmap(t(scale(t(vsd_matTOP[mhcii,]))), show_row_dend = F, name = "Z-score",
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8), column_km = 2,
+        column_names_gp = gpar(fontsize = 8), show_row_names = T)
+```
+
+```{r}
+vsd_matTOP_ENSEMBL <- cbind(gene = rownames(vsd_matTOP_ENSEMBL), data.frame(vsd_matTOP_ENSEMBL))
+rownames(vsd_matTOP_ENSEMBL) <- c(1:nrow(vsd_matTOP_ENSEMBL))
+#write.table(vsd_matTOP_ENSEMBL, file = "rna_vsdmatTOP_ENSEMBL.txt", sep = "\t",
+#            row.names = F)
+```
+
+# Clust on TOP GENES
+
+```{r echo=FALSE, fig.width = 12, fig.height = 4}
+clust_eigen <- data.frame(read_tsv('/Users/senosam/Documents/Massion_lab/RNASeq_summary/Results_23_Sep_20_2/Eigengenes.tsv'))
+rownames(clust_eigen) <- clust_eigen$X1
+clust_eigen$X1 <- NULL
+set.seed(42)
+ha = HeatmapAnnotation(CANARY = as.factor(pData_rnaseq$CANARY),
+    #HLADR_B1 = vsd_matTOP[4,],
+    #HLADR_A = vsd_matTOP[5,],
+    simple_anno_size = unit(0.5, "cm")
+)
+
+Heatmap(as.matrix(clust_eigen), top_annotation = ha, name = "z-score")
+Heatmap(as.matrix(clust_eigen), column_km = 4, top_annotation = ha, name = "z-score")
+```
+
+# Correlation matrix with genes extracted by Clust
+```{r echo=FALSE, fig.width = 10, fig.height = 8}
+clust_genes <- c(as.matrix(data.frame(read_tsv('/Users/senosam/Documents/Massion_lab/RNASeq_summary/Results_23_Sep_20_2/Clusters_Objects.tsv', skip = 1))))
+clust_genes <- na.omit(clust_genes)
+vsd_matTOP_clust <- vsd_matTOP[which(vsd_matTOP_ENSEMBL$gene %in% clust_genes),]
+
+corr_pt <- Hmisc::rcorr(vsd_matTOP_clust, type = 'spearman')
+
+Heatmap(corr_pt$r, name = "mat", 
+        #column_km = 3, 
+        #row_km = 3,
+        heatmap_legend_param = list(color_bar = "continuous"), 
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8))
+```
+
+# Deconvolution data
+
+```{r}
+mcp_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/MCP/mcp_fpkm_dcv.txt", row.names=1)))
+qts_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/QTS/qts_fpkm_dcv.txt", row.names=1)))
+cbs_dcv <- read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/CBS/CIBERSORT.rna_only_fpkm.txt", row.names=1)
+xcell_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/XCELL/xCell_rnaseq_fpkm_xCell_1132060320.txt", row.names=1)))
+
+```
+
+## XCell
+```{r echo=FALSE, fig.width = 10, fig.height = 8}
+set.seed(77)
+ha = HeatmapAnnotation(
+    Stage = as.factor(pData_rnaseq$Stages_simplified),
+    CANARY = as.factor(pData_rnaseq$CANARY),
+    Hist = as.factor(pData_rnaseq$Hist_predominant),
+    Smoking = as.factor(pData_rnaseq$Smoking_Status),
+    DRP = as.factor(pData_rnaseq$DRP_st),
+    HLADR_B1 = vsd_matTOP[4,],
+    HLADR_A = vsd_matTOP[5,],
+    Immune_S = xcell_dcv$ImmuneScore,
+    Stroma_S = xcell_dcv$StromaScore,
+    simple_anno_size = unit(0.5, "cm")
+)
+Heatmap(t(as.matrix(scale(xcell_dcv))), name = "z-score", 
+  heatmap_legend_param = list(color_bar = "continuous"), 
+  row_names_gp = gpar(fontsize = 8),
+  column_names_gp = gpar(fontsize = 8),
+  top_annotation = ha)
+```
+
+```{r echo=FALSE, fig.width = 12, fig.height = 5}
+clust_eigen <- data.frame(read_tsv('/Users/senosam/Documents/Massion_lab/RNASeq_summary/Results_23_Sep_20_2/Eigengenes.tsv'))
+rownames(clust_eigen) <- clust_eigen$X1
+clust_eigen$X1 <- NULL
+set.seed(35)
+Heatmap(as.matrix(clust_eigen), top_annotation = ha, name = "z-score")
+Heatmap(as.matrix(clust_eigen), column_km = 4, top_annotation = ha, name = "z-score")
+```
+
+
+## CIBERSORT
+```{r echo=FALSE, fig.width = 10, fig.height = 8}
+Heatmap(na.omit(t(as.matrix(scale(cbs_dcv[,1:22])))), name = "z-score", 
+  heatmap_legend_param = list(color_bar = "continuous"), 
+  row_names_gp = gpar(fontsize = 8),
+  column_names_gp = gpar(fontsize = 8),
+  top_annotation = ha)
+```
+
+## quanTIseq
+```{r echo=FALSE, fig.width = 10, fig.height = 8}
+Heatmap(t(as.matrix(scale(qts_dcv))), name = "z-score", 
+  heatmap_legend_param = list(color_bar = "continuous"), 
+  row_names_gp = gpar(fontsize = 8),
+  column_names_gp = gpar(fontsize = 8),
+  top_annotation = ha)
+```
+
+## MCP counter
+```{r echo=FALSE, fig.width = 10, fig.height = 8}
+Heatmap(t(as.matrix(scale(mcp_dcv))), name = "z-score", 
+  heatmap_legend_param = list(color_bar = "continuous"), 
+  row_names_gp = gpar(fontsize = 8),
+  column_names_gp = gpar(fontsize = 8),
+  top_annotation = ha)
+```
+
+# Integrating CyTOF data
+```{r}
+read_cytof <- function(path, rna_pdata, ptID_col){
+  prcnt_pt <- scale(read.csv(path, row.names = 1))
+  prcnt_pt <- prcnt_pt[match(rna_pdata[[ptID_col]], rownames(prcnt_pt)),]
+  rownames(prcnt_pt) <- rna_pdata[[ptID_col]]
+  prcnt_pt <- data.frame(prcnt_pt)
+  prcnt_pt
+}
+```
+
+```{r}
+mut <- read.csv('/Users/senosam/Documents/Massion_lab/WES_summary/summary/tma36mut_KRAS-EGFR.csv')
+mut <- mut[-which(mut$Hugo_Symbol=='ALK'), ]
+mut <- mut[-which(duplicated(mut$Tumor_Sample_Barcode) ==TRUE),]
+mut$Tumor_Sample_Barcode = as.character(mut$Tumor_Sample_Barcode)
+pt_ID <- sapply(strsplit(mut$Tumor_Sample_Barcode, "pt"), "[[", 2)
+pt_ID <- sapply(strsplit(pt_ID, "_"), "[[", 1)
+rownames(mut) <- pt_ID
+
+mut <- mut[match(p_all$pt_ID, rownames(mut)),]
+```
+
+```{r}
+prcnt_subtypes <- read_cytof('/Users/senosam/Documents/Massion_lab/CyTOF_summary/summary/prcntbypt_subtypes_CyTOF.csv', p_all, ptID_col='pt_ID')
+prcnt_epi <- read_cytof('/Users/senosam/Documents/Massion_lab/CyTOF_summary/summary/prcntbypt_epitypes_CyTOF.csv', p_all, ptID_col='pt_ID')
+prcnt_stroma <- read_cytof('/Users/senosam/Documents/Massion_lab/CyTOF_summary/summary/prcntbypt_stromatypes_CyTOF.csv', p_all, ptID_col='pt_ID')
+prcnt_maintypes <- read_cytof('/Users/senosam/Documents/Massion_lab/CyTOF_summary/summary/prcntbypt_maintypes_CyTOF.csv', p_all, ptID_col='pt_ID')
+```
+
+```{r}
+k <- which( !is.na(prcnt_epi$Epithelial_1))
+
+```
+
+```{r echo=FALSE, fig.width = 12, fig.height = 5}
+set.seed(50)
+col_fun = circlize::colorRamp2(c(-3, 0, 3), c("blue", "white", "red"))
+ha = HeatmapAnnotation(
+    epi8910 = sort(prcnt_subtypes$Epi_8910[k]),
+    epi123 = prcnt_subtypes$Epi_123[k],
+    epi456 = prcnt_subtypes$Epi_456[k],
+    cd4 = prcnt_subtypes$Th_cells[k],
+    cd8 = prcnt_subtypes$Tc_cells[k],
+    myeloid = prcnt_subtypes$Myeloid[k],
+    immune = prcnt_maintypes$Immune[k],
+    mut = as.factor(mut$Hugo_Symbol)[k],
+    Immune_S = xcell_dcv$ImmuneScore[k],
+    Stroma_S = xcell_dcv$StromaScore[k],
+    col = list(epi8910 = col_fun, immune = col_fun, epi123 = col_fun, epi456 = col_fun,
+               cd4 = col_fun, cd8 = col_fun, myeloid = col_fun),
+    simple_anno_size = unit(0.5, "cm")
+)
+
+clust_eigen <- data.frame(read_tsv('/Users/senosam/Documents/Massion_lab/RNASeq_summary/Results_23_Sep_20_2/Eigengenes.tsv'))
+rownames(clust_eigen) <- clust_eigen$X1
+clust_eigen$X1 <- NULL
+set.seed(55)
+Heatmap(as.matrix(clust_eigen[,k]), top_annotation = ha, name = "z-score")
+Heatmap(as.matrix(clust_eigen[,k]), column_km = 4, top_annotation = ha, name = "z-score", )
+```
+
+
+```{r}
+
+```
