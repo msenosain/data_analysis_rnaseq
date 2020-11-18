@@ -9,7 +9,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
 load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData")
 environment_set()
@@ -68,14 +68,14 @@ rownames(vsd_matTOP) <- top_genes$symbol
 
 ```
 
-```{r echo=FALSE, fig.width = 10, fig.height = 8}
+```{r  , fig.width = 10, fig.height = 8}
 Heatmap(t(scale(t(vsd_matTOP))), show_row_dend = F, name = "Z-score",
         heatmap_legend_param = list(color_bar = "continuous"), 
         row_names_gp = gpar(fontsize = 8),
         column_names_gp = gpar(fontsize = 8), show_row_names = F)
 ```
 
-```{r echo=FALSE, fig.width = 10, fig.height = 8}
+```{r  , fig.width = 10, fig.height = 8}
 corr_pt <- Hmisc::rcorr(vsd_matTOP, type = 'spearman')
 
 Heatmap(corr_pt$r, name = "mat", 
@@ -86,7 +86,7 @@ Heatmap(corr_pt$r, name = "mat",
         column_names_gp = gpar(fontsize = 8))
 ```
 
-```{r echo=FALSE, fig.width = 10, fig.height = 8}
+```{r  , fig.width = 10, fig.height = 8}
 mhcii <- grep('HLA-D',top_genes$symbol)
 Heatmap(t(scale(t(vsd_matTOP[mhcii,]))), show_row_dend = F, name = "Z-score",
         heatmap_legend_param = list(color_bar = "continuous"), 
@@ -103,8 +103,8 @@ rownames(vsd_matTOP_ENSEMBL) <- c(1:nrow(vsd_matTOP_ENSEMBL))
 
 # Clust on TOP GENES
 
-```{r echo=FALSE, fig.width = 12, fig.height = 4}
-clust_eigen <- data.frame(read_tsv('/Users/senosam/Documents/Massion_lab/RNASeq_summary/Results_23_Sep_20_2/Eigengenes.tsv'))
+```{r  , fig.width = 12, fig.height = 4}
+clust_eigen <- data.frame(readr::read_tsv('/Users/senosam/Documents/Massion_lab/RNASeq_summary/Results_23_Sep_20_2/Eigengenes.tsv'))
 rownames(clust_eigen) <- clust_eigen$X1
 clust_eigen$X1 <- NULL
 set.seed(42)
@@ -119,7 +119,7 @@ Heatmap(as.matrix(clust_eigen), column_km = 4, top_annotation = ha, name = "z-sc
 ```
 
 # Correlation matrix with genes extracted by Clust
-```{r echo=FALSE, fig.width = 10, fig.height = 8}
+```{r  , fig.width = 10, fig.height = 8}
 clust_genes <- c(as.matrix(data.frame(read_tsv('/Users/senosam/Documents/Massion_lab/RNASeq_summary/Results_23_Sep_20_2/Clusters_Objects.tsv', skip = 1))))
 clust_genes <- na.omit(clust_genes)
 vsd_matTOP_clust <- vsd_matTOP[which(vsd_matTOP_ENSEMBL$gene %in% clust_genes),]
@@ -145,7 +145,7 @@ xcell_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/dec
 ```
 
 ## XCell
-```{r echo=FALSE, fig.width = 10, fig.height = 8}
+```{r  , fig.width = 10, fig.height = 8}
 set.seed(77)
 ha = HeatmapAnnotation(
     Stage = as.factor(pData_rnaseq$Stages_simplified),
@@ -166,7 +166,7 @@ Heatmap(t(as.matrix(scale(xcell_dcv))), name = "z-score",
   top_annotation = ha)
 ```
 
-```{r echo=FALSE, fig.width = 12, fig.height = 5}
+```{r  , fig.width = 12, fig.height = 5}
 clust_eigen <- data.frame(read_tsv('/Users/senosam/Documents/Massion_lab/RNASeq_summary/Results_23_Sep_20_2/Eigengenes.tsv'))
 rownames(clust_eigen) <- clust_eigen$X1
 clust_eigen$X1 <- NULL
@@ -177,7 +177,7 @@ Heatmap(as.matrix(clust_eigen), column_km = 4, top_annotation = ha, name = "z-sc
 
 
 ## CIBERSORT
-```{r echo=FALSE, fig.width = 10, fig.height = 8}
+```{r  , fig.width = 10, fig.height = 8}
 Heatmap(na.omit(t(as.matrix(scale(cbs_dcv[,1:22])))), name = "z-score", 
   heatmap_legend_param = list(color_bar = "continuous"), 
   row_names_gp = gpar(fontsize = 8),
@@ -186,7 +186,7 @@ Heatmap(na.omit(t(as.matrix(scale(cbs_dcv[,1:22])))), name = "z-score",
 ```
 
 ## quanTIseq
-```{r echo=FALSE, fig.width = 10, fig.height = 8}
+```{r  , fig.width = 10, fig.height = 8}
 Heatmap(t(as.matrix(scale(qts_dcv))), name = "z-score", 
   heatmap_legend_param = list(color_bar = "continuous"), 
   row_names_gp = gpar(fontsize = 8),
@@ -195,7 +195,7 @@ Heatmap(t(as.matrix(scale(qts_dcv))), name = "z-score",
 ```
 
 ## MCP counter
-```{r echo=FALSE, fig.width = 10, fig.height = 8}
+```{r  , fig.width = 10, fig.height = 8}
 Heatmap(t(as.matrix(scale(mcp_dcv))), name = "z-score", 
   heatmap_legend_param = list(color_bar = "continuous"), 
   row_names_gp = gpar(fontsize = 8),
@@ -238,7 +238,7 @@ k <- which( !is.na(prcnt_epi$Epithelial_1))
 
 ```
 
-```{r echo=FALSE, fig.width = 12, fig.height = 5}
+```{r  , fig.width = 12, fig.height = 5}
 set.seed(50)
 col_fun = circlize::colorRamp2(c(-3, 0, 3), c("blue", "white", "red"))
 ha = HeatmapAnnotation(
