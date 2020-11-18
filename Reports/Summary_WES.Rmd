@@ -19,7 +19,7 @@ clin_dt <- read.csv('/Users/senosam/Documents/Massion_lab/CyTOF_summary/CDE_TMA3
 
 # Pre-processing of the data
 ```{r}
-laml = read.maf(maf = maf_dir)
+laml = read.maf(maf = maf_dir, verbose = F)
 x = getClinicalData(laml)
 x$Tumor_Sample_Barcode = as.character(x$Tumor_Sample_Barcode)
 pt_ID <- sapply(strsplit(x$Tumor_Sample_Barcode, "pt"), "[[", 2)
@@ -27,7 +27,7 @@ pt_ID <- sapply(strsplit(pt_ID, "_"), "[[", 1)
 
 clin_dt <- clin_dt[match(pt_ID, clin_dt$pt_ID),]
 clin_dt <- cbind('Tumor_Sample_Barcode'=x$Tumor_Sample_Barcode, clin_dt)
-laml = read.maf(maf = maf_dir, clinicalData = clin_dt)
+laml = read.maf(maf = maf_dir, clinicalData = clin_dt, verbose = F)
 ```
 
 # MAF object
