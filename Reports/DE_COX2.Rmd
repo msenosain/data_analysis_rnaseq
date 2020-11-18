@@ -15,7 +15,7 @@ library("knitr")
 
 # Pre-processing of the data
 ```{r}
-ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData', correct_batch = T, correct_gender = T)
+ls_preprocessed <- preprocess_rna(path_rnaseq = '/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData', correct_batch = T, correct_gender = T)
 ```
 
 # Exploring data
@@ -87,4 +87,33 @@ fgp <- fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_n
 kable(fgp)
 fgp <- fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='PTGS2 low vs high')
 kable(fgp)
+```
+
+
+```{r}
+y <- read.csv('/Users/senosam/Documents/Massion_lab/radiomics_summary/TMA36_CANARY_khushbu.csv')
+vsd_mat <- t(ls_preprocessed$vsd_mat)
+p_all <- ls_preprocessed$p_all
+p_all <- cbind(p_all, 'SILA_S' = y$SILA_S[match(p_all$pt_ID, y$pt_ID)])
+vsd_mat <- data.frame(cbind(vsd_mat, 'SILA_S'=p_all$SILA_S))
+```
+
+```{r  fig.width = 5, fig.height = 2}
+COX1 = "ENSG00000198804.2"
+COX2 = "ENSG00000073756.7"
+
+ggpubr::ggscatter(vsd_mat, x = "SILA_S", y = c(COX1, COX2),
+          add = "reg.line", conf.int = TRUE, combine = TRUE, scales='free',
+          cor.coef = TRUE, add.params = list(color = 'grey65'), expand = c(0, 0),
+          cor.coeff.args = list(method = "spearman"),
+          xlab = "SILA score", ylab = 'VST (gene expression)') +
+          ggpubr::font("xy.text", size = 10) +
+          ggpubr::font("xlab", size = 12, face = 'bold') +
+          ggpubr::font("ylab", size = 12, face = 'bold') 
+```
+
+```{r}
+
+
+
 ```
