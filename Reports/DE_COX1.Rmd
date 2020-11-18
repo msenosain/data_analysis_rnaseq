@@ -15,7 +15,7 @@ library("knitr")
 
 # Pre-processing of the data
 ```{r}
-ls_preprocessed <- preprocess_rna(path_rnaseq = 'rnaseq.RData', correct_batch = T, correct_gender = T)
+ls_preprocessed <- preprocess_rna(path_rnaseq = '/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData', correct_batch = T, correct_gender = T)
 ```
 
 # Exploring data
@@ -87,4 +87,17 @@ fgp <- fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_n
 kable(fgp)
 fgp <- fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='MT-CO1 low vs high')
 kable(fgp)
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
 ```
