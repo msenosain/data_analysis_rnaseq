@@ -99,4 +99,20 @@ write.table(qts_fpkm_dcv, file = file.path(main_path,"deconvolution/output/rna_c
             row.names = FALSE, quote = FALSE)
 
 
+# EpiDISH with Vera's signature
+library(EpiDISH)
+signature <- as.matrix(read.table(file.path(main_path,'deconvolution/gene150_32.txt'), 
+                                  header = TRUE, row.names = 1))
+t1 <- read.table(file.path(main_path,'deconvolution/input/rna_only/rnaseq_tpm_ed.txt'), 
+                 header = TRUE, row.names = 1)
+
+res <- epidish(t1, signature, method = "RPC")
+Fres <- as.data.frame(res$estF)
+Fres <- cbind(Sample = rownames(Fres), Fres)
+Fres[, -1] <- round(Fres[, -1], 3)
+
+write.table(Fres, file.path(main_path, 'deconvolution/output/rna_only/epiDISH/ed_dcv.txt'), 
+            sep = "\t", quote = F, row.names = F, col.names = T)
+
+
 # CIBERSORT and xCell deconv done online
