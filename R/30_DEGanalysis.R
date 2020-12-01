@@ -340,8 +340,8 @@ volcano_plot <- function(res_df, gene=NULL, p_title, pCutoff=0.001, FCcutoff=1.5
         pCutoff=pCutoff,
         FCcutoff=FCcutoff,
         xlim = c(-5,5),
-        transcriptPointSize=2,
-        transcriptLabSize=4,
+        pointSize=2,
+        labSize=4,
         title = p_title))
 }
 
