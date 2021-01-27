@@ -1,0 +1,131 @@
+---
+title: "TMA36 RNA Seq dataset: Indolent vs. Intermediate vs. Aggressive"
+author: "Mafe Senosain"
+date: "`r Sys.Date()`"
+output:
+    html_document:
+        toc: true
+        toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
+source("/Users/senosam/Documents/Repositories/Research/data_analysis_cytof/R/31_supervised_analysis_viz.R")
+load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData")
+environment_set()
+```
+
+# Pre-processing of the data
+```{r}
+ls_preprocessed <- preprocess_rna(path_rnaseq = '/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData', correct_batch = T, correct_gender = T)
+k <- which(p_all$Vantage_ID %in% colnames(ls_preprocessed$vsd_mat))
+p_all <- p_all[k,]
+pData_rnaseq <- pData_rnaseq[k,]
+CDE <- read.csv(file = '/Users/senosam/Documents/Massion_lab/CyTOF_summary/CDE_TMA36_2021JAN13_SA_MF.csv')
+pData_rnaseq <- CDE[match(pData_rnaseq$pt_ID, CDE$pt_ID),]
+```
+
+# Exploring data
+
+## Batch effect correction
+```{r}
+print(ls_preprocessed$pbatch_bf)
+print(ls_preprocessed$pgender_bf)
+print(ls_preprocessed$pbatch_af)
+print(ls_preprocessed$pgender_af)
+```
+
+# Clust on Eigen GENES
+
+```{r  , fig.width = 12, fig.height = 4}
+clust_eigen <- data.frame(readr::read_tsv('/Users/senosam/Documents/Massion_lab/RNASeq_summary/Results_23_Sep_20_2/Eigengenes.tsv'))
+rownames(clust_eigen) <- clust_eigen$X1
+clust_eigen$X1 <- NULL
+frac_hm(t(clust_eigen), pData_rnaseq, 'n_op2')
+```
+
+```{r}
+frac_boxplot(data.frame(t(clust_eigen)), pData_rnaseq, 'n_op2')
+```
+
+# Deconvolution data
+
+```{r}
+mcp_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/MCP/mcp_fpkm_dcv.txt", row.names=1)))
+qts_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/QTS/qts_fpkm_dcv.txt", row.names=1)))
+cbs_dcv <- read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/CBS/CIBERSORT.rna_only_fpkm.txt", row.names=1)
+xcell_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/XCELL/xCell_rnaseq_fpkm_xCell_1132060320.txt", row.names=1)))
+
+```
+
+## XCell
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(xcell_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(xcell_dcv, pData_rnaseq, 'n_op2')
+```
+
+## CIBERSORT
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(cbs_dcv[,1:22], pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(cbs_dcv[,1:22], pData_rnaseq, 'n_op2')
+```
+
+## quanTIseq
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(qts_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(data.frame(qts_dcv), pData_rnaseq, 'n_op2')
+```
+
+## MCP counter
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(mcp_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(data.frame(mcp_dcv), pData_rnaseq, 'n_op2')
+```
+
+# Differential gene expression analysis 
+```{r}
+ls_preprocessed$pData_rnaseq <- pData_rnaseq
+DE_res <- DE_analysis(ls_preprocessed, 
+           GeneBased=FALSE, 
+           pDataBased=TRUE,
+           NewCondition=FALSE,
+           cond_nm='n_op2',
+           two_levels=c('agg','ind'),
+           reference = 'ind',
+           correct_gender=TRUE)
+
+```
+## DE results
+```{r}
+heatmap_200(DE_res$res_df, DE_res$vsd_mat_sym, DE_res$meta_data, DE_res$pData_rnaseq)
+volcano_plot(DE_res$res_df, gene=NULL, p_title='Indolent vs Aggressive')
+
+```
+## Pathway enrichment analysis fGSEA
+CANARY Good prognosis (G) is the reference. When sample is P, pathways shown below are up- or down- regulated
+```{r}
+fgsea_res <- fgsea_analysis(DE_res)
+
+fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='Indolent vs Aggressive')
+fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='Indolent vs Aggressive')
+fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='Indolent vs Aggressive')
+fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='Indolent vs Aggressive')
+fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='Indolent vs Aggressive')
+fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='Indolent vs Aggressive')
+fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='Indolent vs Aggressive')
+fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='Indolent vs Aggressive')
+fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='Indolent vs Aggressive')
+```

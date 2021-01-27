@@ -14,12 +14,14 @@ library(maftools)
 library(dplyr)
 library(knitr)
 maf_dir <- "~/Library/Mobile Documents/com~apple~CloudDocs/Documents/Vanderbilt/Massion_Lab/Projects/CyTOF_ADC_project/Data/WES/TwistWES_Tumor_pipeline.filter.allSamples.maf"
-clin_dt <- read.csv('/Users/senosam/Documents/Massion_lab/CyTOF_summary/CDE_TMA36_2020FEB25_SA.csv')
+clin_dt <- read.csv(file = '/Users/senosam/Documents/Massion_lab/CyTOF_summary/CDE_TMA36_2021JAN13_SA_MF.csv')
 ```
 
 # Pre-processing of the data
 ```{r}
-laml = read.maf(maf = maf_dir, verbose = F)
+single.maf.delim <- read.delim(file = maf_dir, sep = "\t", header = TRUE, fill = TRUE, comment.char = "#")
+laml <- read.maf(maf=single.maf.delim) ###optional, add clinical annotation file with "clinicalData" argument in read.maf()
+
 x = getClinicalData(laml)
 x$Tumor_Sample_Barcode = as.character(x$Tumor_Sample_Barcode)
 pt_ID <- sapply(strsplit(x$Tumor_Sample_Barcode, "pt"), "[[", 2)
@@ -27,7 +29,7 @@ pt_ID <- sapply(strsplit(pt_ID, "_"), "[[", 1)
 
 clin_dt <- clin_dt[match(pt_ID, clin_dt$pt_ID),]
 clin_dt <- cbind('Tumor_Sample_Barcode'=x$Tumor_Sample_Barcode, clin_dt)
-laml = read.maf(maf = maf_dir, clinicalData = clin_dt, verbose = F)
+laml = read.maf(maf = single.maf.delim, clinicalData = clin_dt, verbose = F)
 ```
 
 # MAF object
