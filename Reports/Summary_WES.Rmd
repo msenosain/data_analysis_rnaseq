@@ -43,7 +43,7 @@ plotmafSummary(maf = laml, rmOutlier = TRUE, addStat = 'median', dashboard = TRU
 
 # Oncoplots
 ```{r}
-oncoplot(maf = laml, top = 25)
+oncoplot(maf = laml, top = 25, clinicalFeatures = c('n_op1', 'n_op2'))
 ```
 
 # Transition and Transversions
@@ -85,12 +85,16 @@ plotOncodrive(res = laml.sig, fdrCutOff = 0.2, useFraction = TRUE)
 ```{r}
 histology = clinicalEnrichment(maf = laml, clinicalFeature = 'Hist_predominant')
 stage = clinicalEnrichment(maf = laml, clinicalFeature = 'X8th_ed_path_stage')
+n_op1 = clinicalEnrichment(maf = laml, clinicalFeature = 'n_op1')
+n_op2 = clinicalEnrichment(maf = laml, clinicalFeature = 'n_op2')
 ```
 
 ```{r}
 histology$groupwise_comparision[p_value < 0.05]
 plotEnrichmentResults(enrich_res = histology, pVal = 0.05)
 plotEnrichmentResults(enrich_res = stage, pVal = 0.05)
+plotEnrichmentResults(enrich_res = n_op1, pVal = 0.05)
+plotEnrichmentResults(enrich_res = n_op2, pVal = 0.05)
 ```
 
 # Oncogenic Signaling Pathways
@@ -99,3 +103,15 @@ OncogenicPathways(maf = laml)
 PlotOncogenicPathways(maf = laml, pathways = "RTK-RAS")
 ```
 
+```{r}
+mut_dt <- read.csv(file='/Users/senosam/Documents/Massion_lab/WES_summary/summary/binaryWES.csv', row.names = 1)
+pt_ID <- sapply(strsplit(clin_dt$Tumor_Sample_Barcode, "pt"), "[[", 2)
+pt_ID <- sapply(strsplit(pt_ID, "_"), "[[", 1)
+mut_dt <- mut_dt[match(pt_ID, rownames(mut_dt)),]
+mut_dt['n_op1'] <- clin_dt$n_op1
+mut_dt['n_op2'] <- clin_dt$n_op2
+```
+
+```{r}
+#c('KRAS','EGFR','STK11', 'ALK', 'TP53')
+```
