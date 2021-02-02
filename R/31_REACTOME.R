@@ -1,4 +1,4 @@
-
+library(biomaRt)
 # Reactome pathways
 
 reapaths <- read.table('/Users/senosam/Documents/Repositories/Research/DH_project01/data/Reactome2020/NCBI2Reactome_All_Levels.txt')
@@ -6,7 +6,6 @@ genetopaths <- read.delim('/Users/senosam/Documents/Repositories/Research/DH_pro
 
 dt <- ls_preprocessed$vsd_mat
 rownames(dt) <- sapply(strsplit(rownames(dt), "\\."), "[[", 1)
-DE_genes <- 
 
 genetopaths=genetopaths[which(genetopaths$V8=='Homo sapiens'),]
 genetopaths$V3=sapply(genetopaths$V3,function(x){return(unlist(strsplit(x, split=' \\['))[1])})
@@ -47,10 +46,10 @@ pheatmap(cor(pathexpdf), show_colnames = T, show_rownames=F)
 
 
 
-pathexpdf <- pathexpdf %>%
-  data.frame(.) %>%
-  mutate(OE_ave = (OverExpression1+OverExpression2+OverExpression3)/3,
-    WT_ave = (WT1 + WT2 + WT3)/3)
+# pathexpdf <- pathexpdf %>%
+#   data.frame(.) %>%
+#   mutate(OE_ave = (OverExpression1+OverExpression2+OverExpression3)/3,
+#     WT_ave = (WT1 + WT2 + WT3)/3)
 
 
 # REACTOME vignette
