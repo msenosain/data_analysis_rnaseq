@@ -246,8 +246,25 @@ fgsea_analysis <- function(DE_res){
     c7_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/c7.all.v7.1.symbols.gmt'
     msig_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/msigdb.v7.1.symbols.gmt'
 
-    fgsea_fixed <- function(pthw_path){
-        res <- fgsea(pathways=gmtPathways(pthw_path), stats=ranks, eps = 0) %>% #multilevel
+    # For REACTOME pathways (only work with ENTREZID)
+
+    fgsea_fixed <- function(pthw_path, reactome=FALSE, ranks=ranks){
+        if(reactome){
+            library(org.Hs.eg.db)
+            hs <- org.Hs.eg.db
+            my.symbols <- c(names(ranks))
+            entrz <- AnnotationDbi::select(hs, 
+                keys = my.symbols,
+                columns = c("ENTREZID", "SYMBOL"),
+                keytype = "SYMBOL")
+            entrz <- na.omit(entrz)
+            ranks <- ranks[entrz$SYMBOL]
+            names(ranks) <- entrz$ENTREZID
+            pth <- reactomePathways(names(ranks))
+        }else{
+            pth <- gmtPathways(pthw_path)
+        }
+        res <- fgsea(pathways=pth, stats=ranks, eps = 0) %>% #multilevel, add nPermSimple = 10000
                     as_tibble %>%
                     arrange(padj, desc(abs(NES)))
         res$state <- ifelse(res$NES > 0, "up", "down")
@@ -256,6 +273,8 @@ fgsea_analysis <- function(DE_res){
 
         res
     }
+
+
 
     res_hm <- fgsea_fixed(pthw_path=hallmark_path)
     res_c1 <- fgsea_fixed(pthw_path=c1_path)
@@ -360,23 +379,23 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
             colors
         }
 
+        # Add * code for p vals
+        fgsea_res$pvlabel <- '*'
+        fgsea_res$pvlabel[which(fgsea_res$padj <0.01 & fgsea_res$padj>0.001)] <- '**'
+        fgsea_res$pvlabel[which(fgsea_res$padj<0.001)] <- '***'
 
         if (!is.null(cutoff)) {
             fgsea_res <- fgsea_res %>% filter(padj < cutoff)
         }
-
-        fgsea_res$pvlabel <- '*'
-        fgsea_res$pvlabel[which(fgsea_res$padj <0.01 & fgsea_res$padj>0.001)] <- '**'
-        fgsea_res$pvlabel[which(fgsea_res$padj<0.001)] <- '***'
         
-
         curated_pathways <- fgsea_res %>%
-            dplyr::slice(1:max_pathways)
+                arrange(desc(abs(NES))) %>%
+                dplyr::slice(1:max_pathways)
         curated_pathways['leadingEdge'] <- NULL
         print(ggplot(curated_pathways, aes(reorder(pathway, NES), NES)) +
             geom_col(aes(fill = state), width = 0.5, color = "black") +
             scale_size_manual(values = c(0, 1), guide = "none") +
-            geom_text(aes(label = pvlabel), size = 3) +
+            geom_label(aes(label = pvlabel), size = 3, alpha = 0.75) +
             coord_flip() +
             labs(
                 x = 'Pathway', 
@@ -387,6 +406,11 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
             theme_bw() +
             scale_fill_manual(values = color_levels(curated_pathways)))
 
-        return(knitr::kable(curated_pathways))
+        print(fgsea_res %>% 
+                dplyr::select(-leadingEdge, -ES) %>% 
+                arrange(desc(abs(NES))) %>% 
+                DT::datatable())
+
+        #return(knitr::kable(fgsea_res))
 }
 
