@@ -46,10 +46,12 @@ preprocess_rna <- function(path_rnaseq,
 
     # Remove low variance genes from counts
     if(lowvargenesrm){
-        variances <- apply(rna_all[, 8:ncol(rna_all)], 1, var)
-        sdv <- apply(rna_all[, 8:ncol(rna_all)], 1, sd)
-        q1 <- quantile(variances, na.rm = T)["25%"]
-        idx <- which(is.na(variances) | variances <= q1 | sdv == 0)
+        #variances <- apply(rna_all[, 8:ncol(rna_all)], 1, var)
+        #sdv <- apply(rna_all[, 8:ncol(rna_all)], 1, sd)
+        #q1 <- quantile(variances, na.rm = T)["25%"]
+        #idx <- which(is.na(variances) | variances <= q1 | sdv == 0)
+        x<- rna_all[,8:ncol(rna_all)]
+        idx <- edgeR::filterByExpr(x)
         rna_all <- rna_all[-idx, ]
     }
     
@@ -280,11 +282,11 @@ fgsea_analysis <- function(DE_res){
 
 # plots
 heatmap_200 <- function(res_df, vsd_mat, meta_data, pData_rnaseq, n_genes=200,
-    padj_cutoff = 0.05, l2fc_cutoff=1.5, ha_custom=NULL, row_km=2){
+    pval_cutoff = 0.05, l2fc_cutoff=1.5, ha_custom=NULL, row_km=2, scale_mat = F){
     res_df <- data.frame(res_df) %>%
         filter(abs(log2FoldChange) > l2fc_cutoff) %>%
-        filter(padj < padj_cutoff) %>%
-        arrange(padj)
+        filter(pvalue < pval_cutoff) %>%
+        arrange(pvalue)
 
     if(nrow(res_df)>n_genes){
         gene_list <- res_df %>%
@@ -318,7 +320,10 @@ heatmap_200 <- function(res_df, vsd_mat, meta_data, pData_rnaseq, n_genes=200,
         ha <- ha_custom
     }
 
-    print(Heatmap(as.matrix(filtered_res), name = "mat", 
+    if(scale_mat){
+        filtered_res <- t(scale(t(as.matrix(filtered_res))))
+    }
+    print(Heatmap(filtered_res, name = "mat", 
         #column_km = 2, 
       #row_km = row_km,
       column_split =as.factor(meta_data$Condition),
@@ -327,7 +332,7 @@ heatmap_200 <- function(res_df, vsd_mat, meta_data, pData_rnaseq, n_genes=200,
       column_names_gp = gpar(fontsize = 8), top_annotation = ha))
 }
 
-volcano_plot <- function(res_df, gene=NULL, p_title, pCutoff=0.001, FCcutoff=1.5){
+volcano_plot <- function(res_df, gene=NULL, p_title, pCutoff=0.05, FCcutoff=1.5){
 
     if (!is.null(gene)){
         k <- which(res_df$gene %in% gene)
