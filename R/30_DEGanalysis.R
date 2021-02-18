@@ -19,8 +19,8 @@ environment_set <- function(){
 
 preprocess_rna <- function(path_rnaseq, 
     correct_batch=TRUE, 
-    correct_gender = FALSE,
-    lowvargenesrm = TRUE){
+    lowvargenesrm = TRUE,
+    xychr_rm = TRUE){
     # Load data
     load(path_rnaseq)
 
@@ -54,6 +54,11 @@ preprocess_rna <- function(path_rnaseq,
         idx <- edgeR::filterByExpr(x)
         rna_all <- rna_all[-idx, ]
     }
+
+    if(xychr_rm){
+        idx <- which(rna_all$Feature_chr %in% c('chrX', 'chrY'))
+        rna_all <- rna_all[-idx, ]
+    }
     
     counts_all <- rna_all[, 8:ncol(rna_all)]
     rownames(counts_all) <- rna_all$Feature
@@ -64,36 +69,28 @@ preprocess_rna <- function(path_rnaseq,
     dds <- DESeqDataSetFromMatrix(
       countData = counts_all,
       colData = p_all,
-      design = ~Batch + Gender, tidy = F  
+      design = ~Batch, tidy = F  
     )
     dds <- estimateSizeFactors(dds)
     sizeFactors(dds)
     vsd <- vst(dds)
-
-
-    pbatch_bf <- plotPCA(vsd, "Batch") + labs(fill = "Batch") + ggtitle("Batch raw")
-    pgender_bf <- plotPCA(vsd, "Gender") + labs(fill = "Gender") + ggtitle("Gender raw")
-    
-    # Remove batch effect
-    if(correct_batch&correct_gender){
-        assay(vsd) <- limma::removeBatchEffect(assay(vsd), 
-            batch=vsd$Batch, batch2=vsd$Gender)
-        pbatch_af <- plotPCA(vsd, "Batch") + labs(fill = "Batch") + ggtitle("Batch after BE & GE removal")
-        pgender_af <- plotPCA(vsd, "Gender") + labs(fill = "Gender") + ggtitle("Gender after BE & GE removal")
-    } else if(correct_batch){
-        assay(vsd) <- limma::removeBatchEffect(assay(vsd), 
-            batch=vsd$Batch)
-        pbatch_af <- plotPCA(vsd, "Batch") + labs(fill = "Batch") + ggtitle("Batch after BE removal")
-        pgender_af <- plotPCA(vsd, "Gender") + labs(fill = "Gender") + ggtitle("Gender after BE removal")       
-    }
     vsd_mat <- assay(vsd)
 
     # Save pre-processed data in a list
     dge_preprocessed <- list(p_all=p_all, rna_all=rna_all, 
-        pData_rnaseq=pData_rnaseq, counts_all=counts_all, vsd_mat=vsd_mat,
-        pbatch_bf=pbatch_bf, pgender_bf=pgender_bf, pbatch_af=pbatch_af, 
-        pgender_af=pgender_af)
+        pData_rnaseq=pData_rnaseq, counts_all=counts_all, vsd_mat=vsd_mat)
 
+    # Remove batch effect
+    if(correct_batch){
+        pbatch_bf <- plotPCA(vsd, "Batch") + labs(fill = "Batch") + ggtitle("Batch raw")
+        assay(vsd) <- limma::removeBatchEffect(assay(vsd), batch=vsd$Batch)
+        pbatch_af <- plotPCA(vsd, "Batch") + labs(fill = "Batch") + ggtitle("Batch after BE removal")
+        vsd_mat <- assay(vsd)
+        dge_preprocessed[['vsd_mat']] <- vsd_mat
+        dge_preprocessed[['pbatch_bf']] <- pbatch_bf
+        dge_preprocessed[['pbatch_af']] <- pbatch_af
+    }
+    
     dge_preprocessed
 }
 
@@ -130,7 +127,6 @@ DE_analysis <- function(ls_preprocessed,
     cond_nm, # gene or column name
     two_levels=c('high','low'), # high low, dead alive...
     reference, # low, alive
-    correct_gender=FALSE,
     extremes_only=TRUE
     ){
 
@@ -184,13 +180,6 @@ DE_analysis <- function(ls_preprocessed,
 
     message('Design done')
 
-    if(correct_gender){
-        dds <- DESeqDataSetFromMatrix(
-          countData = counts_all,
-          colData = meta_data,
-          design = ~Batch + Gender + Condition, tidy = F)
-    }
-
     dds <- estimateSizeFactors(dds)
 
     # Generate a transformed matrix with gene symbols
@@ -208,8 +197,7 @@ DE_analysis <- function(ls_preprocessed,
     message('DESeq done')
 
     res <- results(dds, contrast = c('Condition', two_levels))
-    res <- lfcShrink(dds, contrast = c('Condition',two_levels),
-        res=res, type = 'normal')
+    #res <- lfcShrink(dds, contrast = c('Condition',two_levels), res=res, type = 'normal')
     res_df <- data.frame(res) %>% mutate(gene=rownames(.)) %>% as_tibble()
 
     res_df <- res_df %>% 
@@ -284,6 +272,7 @@ fgsea_analysis <- function(DE_res){
 heatmap_200 <- function(res_df, vsd_mat, meta_data, pData_rnaseq, n_genes=200,
     pval_cutoff = 0.05, l2fc_cutoff=1.5, ha_custom=NULL, row_km=2, scale_mat = F){
     res_df <- data.frame(res_df) %>%
+        na.omit() %>%
         filter(abs(log2FoldChange) > l2fc_cutoff) %>%
         filter(pvalue < pval_cutoff) %>%
         arrange(pvalue)
@@ -338,6 +327,7 @@ volcano_plot <- function(res_df, gene=NULL, p_title, pCutoff=0.05, FCcutoff=1.5)
         k <- which(res_df$gene %in% gene)
         res_df <- res_df[-k,]
     }
+    res_df <- na.omit(res_df) #remove NA, these are outliers
     print(EnhancedVolcano(res_df,
         lab = rownames(res_df),
         x = 'log2FoldChange',
