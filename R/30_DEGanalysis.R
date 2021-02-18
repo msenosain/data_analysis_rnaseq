@@ -231,7 +231,8 @@ fgsea_analysis <- function(DE_res){
       na.omit() %>% 
       distinct() %>% 
       group_by(symbol) %>% 
-      summarize(stat=mean(stat))
+      summarize(stat=mean(stat)) %>%
+      arrange(stat)
 
     ranks <- deframe(ranks)
 
@@ -246,7 +247,7 @@ fgsea_analysis <- function(DE_res){
     msig_path <- '/Users/senosam/Documents/Massion_lab/RNASeq_summary/GSEA/msigdb_v7.1_GMTs/msigdb.v7.1.symbols.gmt'
 
     fgsea_fixed <- function(pthw_path){
-        res <- fgsea(pathways=gmtPathways(pthw_path), stats=ranks, nperm=1000) %>%
+        res <- fgsea(pathways=gmtPathways(pthw_path), stats=ranks, eps = 0) %>% #multilevel
                     as_tibble %>%
                     arrange(padj, desc(abs(NES)))
         res$state <- ifelse(res$NES > 0, "up", "down")
@@ -364,13 +365,18 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
             fgsea_res <- fgsea_res %>% filter(padj < cutoff)
         }
 
+        fgsea_res$pvlabel <- '*'
+        fgsea_res$pvlabel[which(fgsea_res$padj <0.01 & fgsea_res$padj>0.001)] <- '**'
+        fgsea_res$pvlabel[which(fgsea_res$padj<0.001)] <- '***'
+        
+
         curated_pathways <- fgsea_res %>%
             dplyr::slice(1:max_pathways)
         curated_pathways['leadingEdge'] <- NULL
         print(ggplot(curated_pathways, aes(reorder(pathway, NES), NES)) +
             geom_col(aes(fill = state), width = 0.5, color = "black") +
             scale_size_manual(values = c(0, 1), guide = "none") +
-            geom_label(aes(label = round(padj, 4)), size = 3) +
+            geom_text(aes(label = pvlabel), size = 3) +
             coord_flip() +
             labs(
                 x = 'Pathway', 
@@ -381,6 +387,6 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
             theme_bw() +
             scale_fill_manual(values = color_levels(curated_pathways)))
 
-        curated_pathways
+        return(knitr::kable(curated_pathways))
 }
 
