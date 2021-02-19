@@ -276,21 +276,74 @@ fgsea_analysis <- function(DE_res){
 
 
 
-    res_hm <- fgsea_fixed(pthw_path=hallmark_path)
-    res_c1 <- fgsea_fixed(pthw_path=c1_path)
-    res_c2 <- fgsea_fixed(pthw_path=c2_path)
-    res_c3 <- fgsea_fixed(pthw_path=c3_path)
-    res_c4 <- fgsea_fixed(pthw_path=c4_path)
-    res_c5 <- fgsea_fixed(pthw_path=c5_path)
-    res_c6 <- fgsea_fixed(pthw_path=c6_path)
-    res_c7 <- fgsea_fixed(pthw_path=c7_path)
-    res_msg <- fgsea_fixed(pthw_path=msig_path)
+    res_hm <- fgsea_fixed(pthw_path=hallmark_path, reactome=FALSE, ranks=ranks)
+    res_c1 <- fgsea_fixed(pthw_path=c1_path, reactome=FALSE, ranks=ranks)
+    res_c2 <- fgsea_fixed(pthw_path=c2_path, reactome=FALSE, ranks=ranks)
+    res_c3 <- fgsea_fixed(pthw_path=c3_path, reactome=FALSE, ranks=ranks)
+    res_c4 <- fgsea_fixed(pthw_path=c4_path, reactome=FALSE, ranks=ranks)
+    res_c5 <- fgsea_fixed(pthw_path=c5_path, reactome=FALSE, ranks=ranks)
+    res_c6 <- fgsea_fixed(pthw_path=c6_path, reactome=FALSE, ranks=ranks)
+    res_c7 <- fgsea_fixed(pthw_path=c7_path, reactome=FALSE, ranks=ranks)
+    res_msg <- fgsea_fixed(pthw_path=msig_path, reactome=FALSE, ranks=ranks)
+    res_rtm <- fgsea_fixed(reactome=TRUE, ranks=ranks)
 
     fgsea_res <- list(res_hm=res_hm, res_c1=res_c1, res_c2=res_c2, 
         res_c3=res_c3, res_c4=res_c4, res_c5=res_c5, res_c6=res_c6,
-        res_c7=res_c7, res_msg=res_msg)
+        res_c7=res_c7, res_msg=res_msg, res_rtm=res_rtm)
 
     fgsea_res
+}
+
+##########################################################################
+# Pathway analysis with KEGG pathways and GO
+##########################################################################
+kegg_go <- function(DE_res, kegg = TRUE, GO = FALSE){
+    
+    library(gage)
+    library(pathview)
+    library(gageData)
+    data(kegg.sets.hs)
+    data(go.sets.hs)
+
+    # Function to put results in a df
+    ls2df <- function(pth_res){
+        pth_res <- pth_res[['greater']] %>%
+                as.data.frame() %>%
+                na.omit()
+        pth_res$state <- ifelse(pth_res$stat.mean > 0, "up", "down")
+        pth_res
+    }  
+
+    # setting up the input
+    res_df=DE_res$res_df
+    res_df$ENSEMBL <- sapply(strsplit(res_df$gene, "\\."), "[[", 1)
+
+    library(org.Hs.eg.db)
+    hs <- org.Hs.eg.db
+    ensmbl <- res_df$ENSEMBL
+    entrz <- AnnotationDbi::select(hs, 
+        keys = ensmbl,
+        columns = c("ENTREZID", "ENSEMBL"),
+        keytype = "ENSEMBL") %>% na.omit()
+    entrz <- merge(res_df, entrz, by='ENSEMBL')
+
+    fc <- entrz$log2FoldChange
+    names(fc) <- entrz$ENTREZID
+
+    # running the KEGG pathway analysis
+    if(kegg){
+        keggres = gage(fc, gsets=kegg.sets.hs, same.dir=TRUE)
+        keggres <- ls2df(keggres)
+        return(keggres)
+    }
+
+    # Running GO 
+    if(GO){
+        gores = gage(fc, gsets=go.sets.hs, same.dir=TRUE)
+        gores <- ls2df(gores) 
+        return(gores)       
+    }
+    #https://www.r-bloggers.com/2015/12/tutorial-rna-seq-differential-expression-pathway-analysis-with-sailfish-deseq2-gage-and-pathview/
 }
 
 # plots
@@ -413,4 +466,52 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
 
         #return(knitr::kable(fgsea_res))
 }
+
+keggGO_plot <- function(keggGO_res, pathways_title, cutoff = 0.05, 
+    max_pathways = 30, condition_name){
+
+        color_levels <- function(fgsea_res) {
+            colors <- c()
+            if (any(keggGO_res$state == "down")) {
+              colors <- c(colors, "lightblue")
+            }
+            if (any(keggGO_res$state == "up")) {
+              colors <- c(colors, "#DC143C")
+            }
+            colors
+        }
+
+        # Add * code for p vals
+        keggGO_res$pvlabel <- '*'
+        keggGO_res$pvlabel[which(keggGO_res$padj <0.01 & keggGO_res$padj>0.001)] <- '**'
+        keggGO_res$pvlabel[which(keggGO_res$padj<0.001)] <- '***'
+
+        if (!is.null(cutoff)) {
+            keggGO_res <- keggGO_res %>% filter(padj < cutoff)
+        }
+        
+        curated_pathways <- keggGO_res %>%
+                arrange(desc(abs(NES))) %>%
+                dplyr::slice(1:max_pathways)
+        curated_pathways['leadingEdge'] <- NULL
+        print(ggplot(curated_pathways, aes(reorder(pathway, NES), NES)) +
+            geom_col(aes(fill = state), width = 0.5, color = "black") +
+            scale_size_manual(values = c(0, 1), guide = "none") +
+            geom_label(aes(label = pvlabel), size = 3, alpha = 0.75) +
+            coord_flip() +
+            labs(
+                x = 'Pathway', 
+                y = "Normalized Enrichment Score",
+                title = str_c(pathways_title, " pathways: ", condition_name),
+                subtitle = str_c("(Cutoff: p.adj <", cutoff, ")")
+            ) +
+            theme_bw() +
+            scale_fill_manual(values = color_levels(curated_pathways)))
+
+        print(keggGO_res %>% 
+                dplyr::select(-leadingEdge, -ES) %>% 
+                arrange(desc(abs(NES))) %>% 
+                DT::datatable())
+}
+
 
