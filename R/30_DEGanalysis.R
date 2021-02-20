@@ -332,14 +332,14 @@ kegg_go <- function(DE_res, kegg = TRUE, GO = FALSE){
 
     # running the KEGG pathway analysis
     if(kegg){
-        keggres = gage(fc, gsets=kegg.sets.hs, same.dir=TRUE)
+        keggres = gage(fc, gsets=kegg.sets.hs, same.dir=FALSE)
         keggres <- ls2df(keggres)
         return(keggres)
     }
 
     # Running GO 
     if(GO){
-        gores = gage(fc, gsets=go.sets.hs, same.dir=TRUE)
+        gores = gage(fc, gsets=go.sets.hs, same.dir=FALSE)
         gores <- ls2df(gores) 
         return(gores)       
     }
@@ -468,7 +468,7 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
 }
 
 keggGO_plot <- function(keggGO_res, pathways_title, cutoff = 0.05, 
-    max_pathways = 30, condition_name){
+    max_pathways = 30, condition_name, pval_colnm){
 
         color_levels <- function(fgsea_res) {
             colors <- c()
@@ -483,35 +483,47 @@ keggGO_plot <- function(keggGO_res, pathways_title, cutoff = 0.05,
 
         # Add * code for p vals
         keggGO_res$pvlabel <- '*'
-        keggGO_res$pvlabel[which(keggGO_res$padj <0.01 & keggGO_res$padj>0.001)] <- '**'
-        keggGO_res$pvlabel[which(keggGO_res$padj<0.001)] <- '***'
+        keggGO_res$pvlabel[which(keggGO_res[,pval_colnm] <0.01 & keggGO_res[,pval_colnm]>0.001)] <- '**'
+        keggGO_res$pvlabel[which(keggGO_res[,pval_colnm]<0.001)] <- '***'
+
+        # Add column for pathway and pathway_id
+        pathway_id <- sapply(strsplit(rownames(keggGO_res), " "), "[[", 1)
+        pathway<- sub("^(?:\\S+\\s+)", "\\1", rownames(x), perl = TRUE)
+        keggGO_res <- cbind(pathway_id, pathway, keggGO_res)
+        rownames(keggGO_res)<-NULL
 
         if (!is.null(cutoff)) {
-            keggGO_res <- keggGO_res %>% filter(padj < cutoff)
+            keggGO_res$pvselect <- keggGO_res[,pval_colnm]
+            keggGO_res <- keggGO_res %>% filter(pvselect < cutoff)
         }
         
         curated_pathways <- keggGO_res %>%
-                arrange(desc(abs(NES))) %>%
+                arrange(desc(abs(stat.mean))) %>%
                 dplyr::slice(1:max_pathways)
-        curated_pathways['leadingEdge'] <- NULL
-        print(ggplot(curated_pathways, aes(reorder(pathway, NES), NES)) +
+
+        print(ggplot(curated_pathways, aes(reorder(pathway, stat.mean), stat.mean)) +
             geom_col(aes(fill = state), width = 0.5, color = "black") +
             scale_size_manual(values = c(0, 1), guide = "none") +
             geom_label(aes(label = pvlabel), size = 3, alpha = 0.75) +
             coord_flip() +
             labs(
-                x = 'Pathway', 
-                y = "Normalized Enrichment Score",
-                title = str_c(pathways_title, " pathways: ", condition_name),
-                subtitle = str_c("(Cutoff: p.adj <", cutoff, ")")
+                x = '', 
+                y = "stats.mean",
+                title = str_c(pathways_title, ": ", condition_name),
+                subtitle = str_c("(Cutoff: ", pval_colnm, " < ", cutoff, ")")
             ) +
             theme_bw() +
             scale_fill_manual(values = color_levels(curated_pathways)))
 
         print(keggGO_res %>% 
-                dplyr::select(-leadingEdge, -ES) %>% 
-                arrange(desc(abs(NES))) %>% 
+                dplyr::select(-exp1, -pvselect) %>% 
+                arrange(desc(abs(stat.mean))) %>% 
                 DT::datatable())
 }
+
+
+#x <- kegg_go(DE_res, kegg = TRUE, GO = FALSE)
+#keggGO_plot(x, pathways_title='KEGG', cutoff = 0.05, 
+#                        max_pathways = 30, condition_name='I VS A', pval_colnm='p.val')
 
 
