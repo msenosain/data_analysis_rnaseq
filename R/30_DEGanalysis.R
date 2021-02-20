@@ -488,7 +488,7 @@ keggGO_plot <- function(keggGO_res, pathways_title, cutoff = 0.05,
 
         # Add column for pathway and pathway_id
         pathway_id <- sapply(strsplit(rownames(keggGO_res), " "), "[[", 1)
-        pathway<- sub("^(?:\\S+\\s+)", "\\1", rownames(x), perl = TRUE)
+        pathway<- sub("^(?:\\S+\\s+)", "\\1", rownames(keggGO_res), perl = TRUE)
         keggGO_res <- cbind(pathway_id, pathway, keggGO_res)
         rownames(keggGO_res)<-NULL
 
