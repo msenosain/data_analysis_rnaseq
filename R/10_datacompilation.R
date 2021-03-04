@@ -1,25 +1,3 @@
-library(edgeR)
-fc <- read.delim("counts_fcounts.txt", stringsAsFactors = FALSE)
-genes <- fc[,1:6]
-counts <- data.matrix(fc[,7:11])
-row.names(counts) <- paste(genes$Geneid, genes$Start, genes$End, sep=".")
-group <- factor( c("FL","FL","HL","HL") )
-y <- DGEList(counts, genes=genes, group=group)
-
-
-rnaseq_counts <- read.delim("~/Documents/Massion_lab/RNA Seq/RnaSeq_3388YZ_Tumor/RnaSeq_3388YZ_Tumor.count.txt")
-
-genes <- rnaseq_counts[,1:8]
-counts <- as.matrix(rnaseq_counts[,9:ncol(rnaseq_counts)])
-
-y <- DGEList(counts, genes=genes)
-
-# y$samples$group <- CANARY or any other classification
-
-# y$samples$lane <- lane  (batch)
-
-# y$samples should have all information on the samples that will be using in the analysis
-
 ###############################################################################
 
 # First Batch
