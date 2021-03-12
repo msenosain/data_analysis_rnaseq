@@ -52,7 +52,7 @@ preprocess_rna <- function(path_rnaseq,
         #idx <- which(is.na(variances) | variances <= q1 | sdv == 0)
         x<- rna_all[,8:ncol(rna_all)]
         idx <- edgeR::filterByExpr(x)
-        rna_all <- rna_all[-idx, ]
+        rna_all <- rna_all[idx, ]
     }
 
     if(xychr_rm){
@@ -70,7 +70,6 @@ preprocess_rna <- function(path_rnaseq,
 
     # Normalize
     p_all$Batch <- as.factor(p_all$Batch)
-    p_all$Gender <- pData_rnaseq$Gender
     dds <- DESeqDataSetFromMatrix(
       countData = counts_all,
       colData = p_all,
@@ -81,18 +80,20 @@ preprocess_rna <- function(path_rnaseq,
     vsd <- vst(dds)
     vsd_mat <- assay(vsd)
 
+    # Assessing batch effect
+    pbatch_bf <- plotPCA(vsd, "Batch") + labs(fill = "Batch") + ggtitle("Batch raw")
+
     # Save pre-processed data in a list
     dge_preprocessed <- list(p_all=p_all, rna_all=rna_all, 
-        pData_rnaseq=pData_rnaseq, counts_all=counts_all, vsd_mat=vsd_mat)
+        pData_rnaseq=pData_rnaseq, counts_all=counts_all, vsd_mat=vsd_mat,
+        pbatch_bf=pbatch_bf)
 
     # Remove batch effect
     if(correct_batch){
-        pbatch_bf <- plotPCA(vsd, "Batch") + labs(fill = "Batch") + ggtitle("Batch raw")
         assay(vsd) <- limma::removeBatchEffect(assay(vsd), batch=vsd$Batch)
         pbatch_af <- plotPCA(vsd, "Batch") + labs(fill = "Batch") + ggtitle("Batch after BE removal")
         vsd_mat <- assay(vsd)
         dge_preprocessed[['vsd_mat']] <- vsd_mat
-        dge_preprocessed[['pbatch_bf']] <- pbatch_bf
         dge_preprocessed[['pbatch_af']] <- pbatch_af
     }
     
@@ -181,7 +182,7 @@ DE_analysis <- function(ls_preprocessed,
     dds <- DESeqDataSetFromMatrix(
       countData = counts_all,
       colData = meta_data,
-      design = ~Batch + Condition, tidy = F)
+      design = ~Condition, tidy = F) #design = ~Batch + Condition, tidy = F)
 
     message('Design done')
 
@@ -459,12 +460,12 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
             theme_bw() +
             scale_fill_manual(values = color_levels(curated_pathways)))
 
-        print(fgsea_res %>% 
+        fgsea_res <- fgsea_res %>% 
                 dplyr::select(-leadingEdge, -ES) %>% 
-                arrange(desc(abs(NES))) %>% 
-                DT::datatable())
+                arrange(desc(abs(NES)))
+                #DT::datatable())
 
-        #return(knitr::kable(fgsea_res))
+        knitr::kable(fgsea_res)
 }
 
 keggGO_plot <- function(keggGO_res, pathways_title, cutoff = 0.05, 
@@ -515,10 +516,12 @@ keggGO_plot <- function(keggGO_res, pathways_title, cutoff = 0.05,
             theme_bw() +
             scale_fill_manual(values = color_levels(curated_pathways)))
 
-        print(keggGO_res %>% 
+        keggGO_res <- keggGO_res %>% 
                 dplyr::select(-exp1, -pvselect) %>% 
-                arrange(desc(abs(stat.mean))) %>% 
-                DT::datatable())
+                arrange(desc(abs(stat.mean)))
+                #DT::datatable())
+
+        knitr::kable(keggGO_res)
 }
 
 
