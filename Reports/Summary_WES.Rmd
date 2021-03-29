@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = FALSE)
 library(maftools)
 library(dplyr)
 library(knitr)
-maf_dir <- "~/Library/Mobile Documents/com~apple~CloudDocs/Documents/Vanderbilt/Massion_Lab/Projects/CyTOF_ADC_project/Data/WES/TwistWES_Tumor_pipeline.filter.allSamples.maf"
+maf_dir <- "/Users/senosam/Documents/Massion_lab/WES_summary/TwistWES_Tumor_pipeline.freq0.01.filtered.tsv_020921.maf"
 clin_dt <- read.csv(file = '/Users/senosam/Documents/Massion_lab/CyTOF_summary/CDE_TMA36_2021JAN13_SA_MF.csv')
 ```
 
@@ -27,7 +27,7 @@ x$Tumor_Sample_Barcode = as.character(x$Tumor_Sample_Barcode)
 pt_ID <- sapply(strsplit(x$Tumor_Sample_Barcode, "pt"), "[[", 2)
 pt_ID <- sapply(strsplit(pt_ID, "_"), "[[", 1)
 
-clin_dt <- clin_dt[match(pt_ID, clin_dt$pt_ID),]
+clin_dt <- clin_dt[which(clin_dt$pt_ID %in% pt_ID),]
 clin_dt <- cbind('Tumor_Sample_Barcode'=x$Tumor_Sample_Barcode, clin_dt)
 laml = read.maf(maf = single.maf.delim, clinicalData = clin_dt, verbose = F)
 ```
@@ -43,7 +43,7 @@ plotmafSummary(maf = laml, rmOutlier = TRUE, addStat = 'median', dashboard = TRU
 
 # Oncoplots
 ```{r}
-oncoplot(maf = laml, top = 25, clinicalFeatures = c('n_op1', 'n_op2'))
+oncoplot(maf = laml, top = 25, clinicalFeatures = c('n_op2'))
 ```
 
 # Transition and Transversions
@@ -55,7 +55,7 @@ plotTiTv(res = laml.titv)
 
 # KRAS mutations
 ```{r}
-lollipopPlot(maf = laml, gene = 'KRAS', AACol = 'Protein_Change', showMutationRate = TRUE)
+lollipopPlot(maf = laml, gene = 'KRAS', AACol = 'AAChange', showMutationRate = TRUE)
 lollipopPlot(maf = laml, gene = 'KRAS', showDomainLabel = FALSE, labelPos = 'all')
 ```
 
@@ -103,15 +103,69 @@ OncogenicPathways(maf = laml)
 PlotOncogenicPathways(maf = laml, pathways = "RTK-RAS")
 ```
 
+# Clinical enrichment analysis (by aggressiveness)
 ```{r}
-mut_dt <- read.csv(file='/Users/senosam/Documents/Massion_lab/WES_summary/summary/binaryWES.csv', row.names = 1)
-pt_ID <- sapply(strsplit(clin_dt$Tumor_Sample_Barcode, "pt"), "[[", 2)
-pt_ID <- sapply(strsplit(pt_ID, "_"), "[[", 1)
-mut_dt <- mut_dt[match(pt_ID, rownames(mut_dt)),]
-mut_dt['n_op1'] <- clin_dt$n_op1
-mut_dt['n_op2'] <- clin_dt$n_op2
+fab.ce = clinicalEnrichment(maf = laml, clinicalFeature = 'n_op2')
 ```
 
 ```{r}
-#c('KRAS','EGFR','STK11', 'ALK', 'TP53')
+fab.ce$groupwise_comparision[p_value < 0.05]
+```
+
+```{r}
+plotEnrichmentResults(enrich_res = fab.ce, pVal = 0.05, geneFontSize = 0.5, annoFontSize = 0.6)
+```
+# Comparing groups (separate MAFs)
+```{r}
+ind_maf <- subsetMaf(laml, clinQuery="n_op2 == 'ind'")
+int_maf <- subsetMaf(laml, clinQuery="n_op2 == 'int'")
+agg_maf <- subsetMaf(laml, clinQuery="n_op2 == 'agg'")
+```
+
+## Indolent vs Aggressive
+```{r}
+pt.vs.rt <- mafCompare(m1 = ind_maf, m2 = agg_maf, m1Name = 'Indolent', m2Name = 'Aggressive', minMut = 5)
+knitr::kable(pt.vs.rt$results)
+knitr::kable(pt.vs.rt$SampleSummary)
+```
+
+```{r  , fig.width = 10, fig.height = 8}
+#forestPlot(mafCompareRes = pt.vs.rt, pVal = 0.1, color = c('royalblue', 'maroon'), geneFontSize = 0.8)
+```
+
+```{r}
+#genes = c("PML", "RARA", "RUNX1", "ARID1B", "FLT3")
+coOncoplot(m1 = ind_maf, m2 = agg_maf, m1Name = 'Indolent', m2Name = 'Aggressive',
+           removeNonMutated = TRUE)
+```
+
+```{r}
+coBarplot(m1 = ind_maf, m2 = agg_maf, m1Name = 'Indolent', m2Name = 'Aggressive')
+```
+
+## Indolent+Intermediate vs Aggressive
+```{r}
+ind_maf <- subsetMaf(laml, clinQuery="n_op2 %in% c('ind', 'int')")
+agg_maf <- subsetMaf(laml, clinQuery="n_op2 == 'agg'")
+```
+
+```{r}
+pt.vs.rt <- mafCompare(m1 = ind_maf, m2 = agg_maf, m1Name = 'Indolent + Int', m2Name = 'Aggressive', minMut = 5)
+knitr::kable(pt.vs.rt$results)
+knitr::kable(pt.vs.rt$SampleSummary)
+```
+
+```{r  , fig.width = 10, fig.height = 8}
+forestPlot(mafCompareRes = pt.vs.rt, pVal = 0.1, color = c('royalblue', 'maroon'), geneFontSize = 0.8)
+```
+
+```{r}
+#genes = c("PML", "RARA", "RUNX1", "ARID1B", "FLT3")
+coOncoplot(m1 = ind_maf, m2 = agg_maf, m1Name = 'Indolent + Int', m2Name = 'Aggressive',
+           removeNonMutated = TRUE)
+
+```
+
+```{r}
+coBarplot(m1 = ind_maf, m2 = agg_maf, m1Name = 'Indolent + Int', m2Name = 'Aggressive')
 ```

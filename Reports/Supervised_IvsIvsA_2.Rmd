@@ -105,7 +105,6 @@ volcano_plot(DE_res$res_df, gene=NULL, p_title='Indolent vs Aggressive')
 
 </div>
 
-
 ```{r}
 l2fc_cutoff=1.5
 pval_cutoff = 0.05
@@ -123,68 +122,80 @@ knitr::kable(res_df)
 Indolent (n_op2 = 'ind') is the reference.
 When sample is Aggressive ('agg'), pathways shown below are up- or down- regulated
 
-• pathway – name of the pathway as in ‘names(pathway)‘;
-• pval – an enrichment p-value;
-• padj – a BH-adjusted p-value;
-• log2err – the expected error for the standard deviation of the P-value logarithm.
-• ES – enrichment score, same as in Broad GSEA implementation;
-• NES – enrichment score normalized to mean enrichment of random samples of the same size;
-• size – size of the pathway after removing genes not present in ‘names(stats)‘.
-• leadingEdge – vector with indexes of leading edge genes that drive the enrichment, see http:
-//software.broadinstitute.org/gsea/doc/GSEAUserGuideTEXT.htm#_Running_a_Leading.
-
-
+> -   pathway -- name of the pathway as in 'names(pathway)';
+>
+> -   pval -- an enrichment p-value;
+>
+> -   padj -- a BH-adjusted p-value;
+>
+> -   log2err -- the expected error for the standard deviation of the P-value logarithm.
+>
+> -   ES -- enrichment score, same as in Broad GSEA implementation;
+>
+> -   NES -- enrichment score normalized to mean enrichment of random samples of the same size; • size -- size of the pathway after removing genes not present in 'names(stats)'.
+>
+> -   leadingEdge -- vector with indexes of leading edge genes that drive the enrichment, see http://software.broadinstitute.org/gsea/doc/GSEAUserGuideTEXT.htm\#\_Running_a\_Leading.
 
 ```{r echo=FALSE}
 fgsea_res <- fgsea_analysis(DE_res)
 ```
 
 ### Hallmark Pathways
+
 ```{r echo=FALSE, fig.width = 15, fig.height = 10}
 fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='Indolent vs Aggressive')
 ```
 
 ### C1 positional genes Pathways
+
 ```{r echo=FALSE, fig.width = 15, fig.height = 10}
 fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='Indolent vs Aggressive')
 ```
 
 ### C2 curated genes Pathways
+
 ```{r echo=FALSE, fig.width = 15, fig.height = 10}
 fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='Indolent vs Aggressive')
 ```
 
 ### C3 regulatory target genes Pathways
+
 ```{r echo=FALSE, fig.width = 15, fig.height = 10}
 fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='Indolent vs Aggressive')
 ```
 
 ### C4 cancer Pathways
+
 ```{r echo=FALSE, fig.width = 15, fig.height = 10}
 fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='Indolent vs Aggressive')
 ```
 
 ### C5 GO genes Pathways
+
 ```{r echo=FALSE, fig.width = 15, fig.height = 10}
 fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='Indolent vs Aggressive')
 ```
 
 ### C6 oncogenic Pathways
+
 ```{r echo=FALSE, fig.width = 15, fig.height = 10}
 fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='Indolent vs Aggressive')
 ```
 
 ### C7 immunologic Pathways
+
 ```{r echo=FALSE, fig.width = 15, fig.height = 10}
 fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='Indolent vs Aggressive')
 ```
 
 ### All signatures Pathways
+
 ```{r echo=FALSE, fig.width = 15, fig.height = 10}
 fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='Indolent vs Aggressive')
 ```
 
 ### REACTOME Pathways
+
 ```{r echo=FALSE, fig.width = 15, fig.height = 10}
 fgsea_plot(fgsea_res$res_rtm, pathways_title='REACTOME', condition_name='Indolent vs Aggressive')
 ```
@@ -338,7 +349,7 @@ compare_hla <- function(ls_preprocessed, mat_name, hla_ids, hla_gsym, BPplot = T
     arrange(p.value) %>%
     slice(which(p.value < 0.09))
   
-  print(sum_df)
+  #print(sum_df)
   
   # boxplots
   if(BPplot){
@@ -368,6 +379,7 @@ compare_hla <- function(ls_preprocessed, mat_name, hla_ids, hla_gsym, BPplot = T
     }
    
   }
+  knitr::kable(sum_df)
 
 }
 ```
@@ -394,6 +406,8 @@ compare_hla(ls_preprocessed, mat_name='fpkm_all', rownames(de_hla), de_hla$gene,
 ```
 
 # Transcription Factor activiy (VIPER)
+
+For documentation click here <https://bioconductor.org/packages/release/bioc/vignettes/viper/inst/doc/viper.pdf>
 
 ```{r}
 library(viper)
@@ -434,26 +448,20 @@ agg_i <- which(ls_preprocessed$pData_rnaseq$n_op2 == 'agg')
 
 mat_ind <- as.matrix(data[,ind_i])
 mat_agg <- as.matrix(data[,agg_i])
-```
 
-### Generating NULL model
-
-```{r}
+# Generating NULL model
 dnull <- ttestNull(mat_agg, mat_ind, per=1000)
-```
 
-### Generating signature
-
-```{r}
+# Generating signature
 signature <- rowTtest(mat_agg, mat_ind)
 signature <- (qnorm(signature$p.value/2, lower.tail = FALSE) * sign(signature$statistic))[, 1]
-```
 
-### Running msVIPER
-
-```{r}
+# Running msVIPER
 mrs <- msviper(signature, regu, dnull, verbose = FALSE)
 ```
+
+VIPER plot showing the projection of the negative (repressed, shown in blue color) and positive (activated, shown in red color) targets for each TF, as inferred by ARACNe and correlation analysis when reverse engineering the regulatory network (vertical lines resembling a bar-code), on the GES (x-axis), where the genes in the GES were rank-sorted from the one most down-regulated to the one most upregulated in the 'test' vs 'reference' conditions.
+The optional two-columns heatmap displayed on the right side of the figure shows the inferred differential activity (first column) and differential expression (second column), with the rank of the displayed genes in the GES (shown all the way to the right).
 
 ```{r}
 knitr::kable(summary(mrs))
@@ -462,33 +470,27 @@ plot(mrs, cex = .7)
 
 ### Leading-edge analysis
 
-To identify the genes driving the enrichment of a gene-set on a GES based on Gene Set Enrichment Analysis (GSEA).
+To identify the genes driving the enrichment of a gene-set on a gene expression signature (GES) based on Gene Set Enrichment Analysis (GSEA).
 
 ```{r}
 mrs <- ledge(mrs)
 knitr::kable(summary(mrs))
 ```
 
-### Shadow analysis
-
-```{r}
+```{r eval = FALSE, echo = FALSE}
+# Shadow analysis
 mrshadow <- shadow(mrs, regulators = 25, verbose = FALSE)
+summary(mrshadow)
 knitr::kable(summary(mrshadow))
-```
 
-### Synergy analysis
-
-```{r}
+# Synergy analysis
 mrs <- msviperCombinatorial(mrs, regulators = 25, verbose = FALSE)
 mrs <- msviperSynergy(mrs, verbose = FALSE)
-```
-
-```{r}
 knitr::kable(summary(mrs))
 plot(mrs)
 ```
 
-# Deconvolution
+# Deconvolution Results
 
 ```{r}
 mcp_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/MCP/mcp_fpkm_dcv.txt", row.names=1)))

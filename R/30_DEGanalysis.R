@@ -461,7 +461,7 @@ fgsea_plot <- function(fgsea_res, pathways_title, cutoff = 0.05,
             scale_fill_manual(values = color_levels(curated_pathways)))
 
         fgsea_res <- fgsea_res %>% 
-                dplyr::select(-leadingEdge, -ES) %>% 
+                #dplyr::select(-leadingEdge, -ES) %>% 
                 arrange(desc(abs(NES)))
                 #DT::datatable())
 
