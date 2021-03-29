@@ -1,0 +1,539 @@
+---
+title: "TMA36 RNA Seq dataset: Indolent vs. Intermediate vs. Aggressive"
+author: "Mafe Senosain"
+date: "`r Sys.Date()`"
+output:
+    html_document:
+        toc: true
+        toc_float: true
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+source('/Users/senosam/Documents/Repositories/Research/data_analysis_rnaseq/R/30_DEGanalysis.R')
+source("/Users/senosam/Documents/Repositories/Research/data_analysis_cytof/R/51_supervised_analysis_viz.R")
+source("/Users/senosam/Documents/Repositories/Research/data_analysis_cytof/R/20_ClustAnnot_functions.R")
+load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData")
+environment_set()
+```
+
+# Pre-processing of the data
+
+```{r}
+ls_preprocessed <- preprocess_rna(path_rnaseq = '/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData', 
+                                  correct_batch = F, lowvargenesrm = T, prot_coding_only = F, xychr_rm = T)
+
+CDE <- read.csv(file = '/Users/senosam/Documents/Massion_lab/CyTOF_summary/CDE_TMA36_2021JAN13_SA_MF.csv')
+pData_rnaseq <- CDE[match(ls_preprocessed$pData_rnaseq$pt_ID, CDE$pt_ID),]
+ls_preprocessed$pData_rnaseq <- pData_rnaseq
+```
+
+```{r}
+# adding FPKM
+rownames(fpkm_all) <- fpkm_all$Feature
+fpkm_all <- fpkm_all[match(ls_preprocessed$rna_all$Feature, rownames(fpkm_all)),]
+fpkm_all <- fpkm_all[,ls_preprocessed$p_all$Vantage_ID]
+ls_preprocessed$fpkm_all <- as.matrix(fpkm_all)
+
+# adding TPM
+rownames(tpm_all) <- rna_all$Feature
+tpm_all <- tpm_all[match(ls_preprocessed$rna_all$Feature, rownames(tpm_all)),]
+tpm_all <- tpm_all[,ls_preprocessed$p_all$Vantage_ID]
+ls_preprocessed$tpm_all <- tpm_all
+```
+
+# Exploring data
+
+## Batch effect
+
+```{r echo=FALSE}
+print(ls_preprocessed$pbatch_bf)
+#print(ls_preprocessed$pbatch_af)
+```
+
+# Differential gene expression analysis
+
+```{r echo=FALSE}
+DE_res <- DE_analysis(ls_preprocessed, 
+           GeneBased=FALSE, 
+           pDataBased=TRUE,
+           NewCondition=FALSE,
+           cond_nm='n_op2',
+           two_levels=c('agg','ind'),
+           reference = 'ind')
+
+```
+
+## DE results
+
+### Top DE genes: Heatmap
+
+```{r echo=FALSE, fig.width = 7, fig.height = 12}
+heatmap_200(DE_res$res_df, DE_res$vsd_mat_sym, DE_res$meta_data, DE_res$pData_rnaseq, scale_mat = T)
+```
+
+### Top DE genes: Volcano plot
+
+```{r echo=FALSE}
+volcano_plot(DE_res$res_df, gene=NULL, p_title='Indolent vs Aggressive')
+```
+
+### Top DE genes: table (cutoffs: pval\<0.05, L2FC \> 1.5)
+
+<div>
+
+> -   baseMean---The average of the normalized count values, dividing by size factors, taken over all samples.
+>
+> -   log2FoldChange--The effect size estimate.
+>     This value indicates how much the gene or transcript's expression seems to have changed between the comparison and control groups.
+>     This value is reported on a logarithmic scale to base 2.
+>
+> -   lfcSE--The standard error estimate for the log2 fold change estimate.
+>
+> -   stat--The value of the test statistic for the gene or transcript.
+>
+> -   pvalue--P-value of the test for the gene or transcript.
+>
+> -   padj--Adjusted P-value for multiple testing for the gene or transcript.
+>
+> -   gene-Gene ID from ENSEMBL database
+>
+> -   Symbol---Gene name
+
+</div>
+
+
+```{r}
+l2fc_cutoff=1.5
+pval_cutoff = 0.05
+res_df <- data.frame(DE_res$res_df) %>%
+  na.omit() %>%
+  filter(abs(log2FoldChange) > l2fc_cutoff) %>%
+  filter(pvalue < pval_cutoff) %>%
+  arrange(pvalue)
+rownames(res_df) <- NULL
+knitr::kable(res_df)
+```
+
+## Pathway enrichment analysis fGSEA
+
+Indolent (n_op2 = 'ind') is the reference.
+When sample is Aggressive ('agg'), pathways shown below are up- or down- regulated
+
+• pathway – name of the pathway as in ‘names(pathway)‘;
+• pval – an enrichment p-value;
+• padj – a BH-adjusted p-value;
+• log2err – the expected error for the standard deviation of the P-value logarithm.
+• ES – enrichment score, same as in Broad GSEA implementation;
+• NES – enrichment score normalized to mean enrichment of random samples of the same size;
+• size – size of the pathway after removing genes not present in ‘names(stats)‘.
+• leadingEdge – vector with indexes of leading edge genes that drive the enrichment, see http:
+//software.broadinstitute.org/gsea/doc/GSEAUserGuideTEXT.htm#_Running_a_Leading.
+
+
+
+```{r echo=FALSE}
+fgsea_res <- fgsea_analysis(DE_res)
+```
+
+### Hallmark Pathways
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+fgsea_plot(fgsea_res$res_hm, pathways_title='Hallmark', condition_name='Indolent vs Aggressive')
+```
+
+### C1 positional genes Pathways
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+fgsea_plot(fgsea_res$res_c1, pathways_title='C1 positional genes', condition_name='Indolent vs Aggressive')
+```
+
+### C2 curated genes Pathways
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+fgsea_plot(fgsea_res$res_c2, pathways_title='C2 curated genes', condition_name='Indolent vs Aggressive')
+```
+
+### C3 regulatory target genes Pathways
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+fgsea_plot(fgsea_res$res_c3, pathways_title='C3 regulatory target genes', condition_name='Indolent vs Aggressive')
+```
+
+### C4 cancer Pathways
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+fgsea_plot(fgsea_res$res_c4, pathways_title='C4 cancer', condition_name='Indolent vs Aggressive')
+```
+
+### C5 GO genes Pathways
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+fgsea_plot(fgsea_res$res_c5, pathways_title='C5 GO genes', condition_name='Indolent vs Aggressive')
+```
+
+### C6 oncogenic Pathways
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+fgsea_plot(fgsea_res$res_c6, pathways_title='C6 oncogenic', condition_name='Indolent vs Aggressive')
+```
+
+### C7 immunologic Pathways
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+fgsea_plot(fgsea_res$res_c7, pathways_title='C7 immunologic', condition_name='Indolent vs Aggressive')
+```
+
+### All signatures Pathways
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+fgsea_plot(fgsea_res$res_msg, pathways_title='All signatures', condition_name='Indolent vs Aggressive')
+```
+
+### REACTOME Pathways
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+fgsea_plot(fgsea_res$res_rtm, pathways_title='REACTOME', condition_name='Indolent vs Aggressive')
+```
+
+## KEGG pathway analysis
+
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+keggres <- kegg_go(DE_res, kegg = T, GO = F)
+keggGO_plot(keggres, pathways_title='KEGG', cutoff = 0.05, 
+             max_pathways = 10, condition_name='Indolent vs Aggressive', pval_colnm='p.val')
+```
+
+## Gene Ontology analysis
+
+```{r echo=FALSE, fig.width = 15, fig.height = 10}
+keggres <- kegg_go(DE_res, kegg = F, GO = T)
+keggGO_plot(keggres, pathways_title='GO', cutoff = 0.05, 
+             max_pathways = 10, condition_name='Indolent vs Aggressive', pval_colnm='p.val')
+```
+
+# Associations of MHC-II related genes with SILA
+
+```{r}
+hla_i <- grep('^HLA', ls_preprocessed$rna_all$Feature_gene_name)
+hla_ids <- as.character(ls_preprocessed$rna_all$Feature[hla_i])
+hla_gsym <- as.character(ls_preprocessed$rna_all$Feature_gene_name[hla_i])
+```
+
+```{r}
+# Filter MHC-II related genes from DE genes
+de_hla <- data.frame(DE_res$res)[hla_ids,] %>%
+  mutate(gene=hla_gsym) %>%
+  arrange(desc(abs(log2FoldChange))) %>%
+  slice(which(pvalue<0.05))
+```
+
+## Compare MHC-II related genes I vs A
+
+```{r}
+hm_genes <- function(ls_preprocessed, mat_name, hla_ids, hla_gsym, scale_mat = TRUE){
+  int_idx <- which(ls_preprocessed$pData_rnaseq$n_op2 == 'int')
+  mat <- as.matrix(ls_preprocessed[[mat_name]])
+  mat <- mat[,-int_idx]
+  mat <- mat[hla_ids,]
+  ha = HeatmapAnnotation(
+    Condition = as.factor(ls_preprocessed$pData_rnaseq$n_op2[-int_idx]),
+    SILA = ls_preprocessed$pData_rnaseq$SILA[-int_idx],
+    Stage = ls_preprocessed$pData_rnaseq$Stages_simplified[-int_idx],
+    simple_anno_size = unit(0.5, "cm")
+  )
+  if(scale_mat){
+    mat <- t(scale(t(mat)))
+  }
+  rownames(mat) <- hla_gsym
+  Heatmap(mat, name = "mat", 
+    column_split = as.factor(ls_preprocessed$pData_rnaseq$n_op2[-int_idx]),
+    heatmap_legend_param = list(color_bar = "continuous"), 
+    row_names_gp = gpar(fontsize = 8),
+    column_names_gp = gpar(fontsize = 8), top_annotation = ha)
+  
+}
+```
+
+### Using VST normed genes
+
+```{r}
+hm_genes(ls_preprocessed, 'vsd_mat', hla_ids, hla_gsym, scale_mat = T)
+hm_genes(ls_preprocessed, 'vsd_mat', rownames(de_hla), de_hla$gene, scale_mat = T)
+```
+
+### Using TPM normed genes
+
+```{r}
+hm_genes(ls_preprocessed, 'tpm_all', hla_ids, hla_gsym, scale_mat = T)
+hm_genes(ls_preprocessed, 'tpm_all', rownames(de_hla), de_hla$gene, scale_mat = T)
+```
+
+### Using FPKM normed genes
+
+```{r}
+hm_genes(ls_preprocessed, 'fpkm_all', hla_ids, hla_gsym, scale_mat = T)
+hm_genes(ls_preprocessed, 'fpkm_all', rownames(de_hla), de_hla$gene, scale_mat = T)
+```
+
+## PCA of patients using MHC-II related genes
+
+```{r}
+pca_hla <- function(ls_preprocessed, mat_name, hla_ids, scale_mat = TRUE){
+  int_idx <- which(ls_preprocessed$pData_rnaseq$n_op2 == 'int')
+  mat <- data.frame(t(ls_preprocessed[[mat_name]][hla_ids,]))
+  mat <- cbind(mat, 'SILA'=ls_preprocessed$pData_rnaseq$SILA,
+                              "n_op2"=ls_preprocessed$pData_rnaseq$n_op2)
+  mat <- mat[-int_idx,]
+  
+  x <- mat[,-which(colnames(mat) %in% c("SILA","n_op2"))]
+  
+  if(scale_mat){
+    x <- scale(x)
+  }
+  pca_hla <- cbind(data.frame(prcomp(x)$x), 'SILA'=mat$SILA,
+                              "n_op2"=mat$n_op2)
+  ggplot(pca_hla, aes(PC1, PC2, color = n_op2)) +
+    geom_point()
+  
+}
+```
+
+### Using VST normed genes
+
+```{r}
+pca_hla(ls_preprocessed, mat_name='vsd_mat', hla_ids, scale_mat = F)
+pca_hla(ls_preprocessed, mat_name='vsd_mat', hla_ids, scale_mat = T)
+```
+
+### Using TPM normed genes
+
+```{r}
+pca_hla(ls_preprocessed, mat_name='tpm_all', hla_ids, scale_mat = F)
+pca_hla(ls_preprocessed, mat_name='tpm_all', hla_ids, scale_mat = T)
+```
+
+### Using FPKM normed genes
+
+```{r}
+pca_hla(ls_preprocessed, mat_name='fpkm_all', hla_ids, scale_mat = F)
+pca_hla(ls_preprocessed, mat_name='fpkm_all', hla_ids, scale_mat = T)
+```
+
+## Compare MHC-II related genes I vs A
+
+```{r}
+compare_hla <- function(ls_preprocessed, mat_name, hla_ids, hla_gsym, BPplot = T){
+  int_idx <- which(ls_preprocessed$pData_rnaseq$n_op2 == 'int')
+  mat <- data.frame(t(ls_preprocessed[[mat_name]][hla_ids,]))
+  mat <- cbind(mat, 'SILA'=ls_preprocessed$pData_rnaseq$SILA,
+                              "n_op2"=ls_preprocessed$pData_rnaseq$n_op2)
+  mat <- mat[-int_idx,]
+  
+  sum_df <- data.frame(matrix(nrow = 0, ncol = 4))
+  ind <- which(mat$n_op2 == 'ind')
+  for (i in colnames(mat)[grep("ENS",colnames(mat))]){
+    ind_med <- median(mat[ind,i])
+    agg_med <- median(mat[-ind,i])
+    pval <- wilcox.test(mat[ind,i], mat[-ind,i])
+    sum_df <- rbind(sum_df, c(i,ind_med, agg_med, pval$p.value))
+  }
+  colnames(sum_df) <- c('Gene', 'Median.Ind', 'Median.Agg', 'p.value')
+  sum_df['p.adjusted'] <- p.adjust(sum_df$p.value, method = "BH")
+  sum_df <- cbind('Symbol'=hla_gsym, sum_df)
+  sum_df <- sum_df %>%
+    arrange(p.value) %>%
+    slice(which(p.value < 0.09))
+  
+  print(sum_df)
+  
+  # boxplots
+  if(BPplot){
+    x <- mat[,sum_df$Gene]
+    colnames(x) <- sum_df$Symbol
+    x['n_op2'] <- mat$n_op2
+    x <- reshape2::melt(x)
+    lb <- x$n_op2
+    lb[which(x[,'n_op2'] == 'agg')] <- 'Aggressive'
+    lb[-which(x[,'n_op2'] == 'agg')] <- 'Indolent'
+    levels = c('Indolent', 'Aggressive')
+    x['n_op2'] <- factor(lb, levels = levels)
+    
+    comp =  list(c("Indolent", "Aggressive"))
+    colr = c("#3498DB", "#EC7063")
+    
+    if(nrow(sum_df)>1){
+      ggplot(x, aes(x=n_op2, y=value, color = n_op2)) +
+        geom_boxplot() +
+        ggsignif::geom_signif(comparisons = comp, 
+                              map_signif_level=TRUE) +
+        facet_wrap(~variable, scales='free') +
+        theme(plot.title = element_text(hjust = 0.5, size=22))+
+        scale_color_manual(values=colr, name = "Behavior")       
+    }else{
+      #ggplot(x, aes(x=n_op2, y=value, color = n_op2)) +
+    }
+   
+  }
+
+}
+```
+
+### Using VST normed genes
+
+```{r echo=FALSE, fig.width = 8, fig.height = 3}
+compare_hla(ls_preprocessed, mat_name='vsd_mat', hla_ids, hla_gsym,  BPplot = T)
+compare_hla(ls_preprocessed, mat_name='vsd_mat', rownames(de_hla), de_hla$gene, BPplot = FALSE)
+```
+
+### Using TPM normed genes
+
+```{r echo=FALSE, fig.width = 8, fig.height = 3}
+compare_hla(ls_preprocessed, mat_name='tpm_all', hla_ids, hla_gsym, BPplot = T)
+compare_hla(ls_preprocessed, mat_name='tpm_all', rownames(de_hla), de_hla$gene, BPplot = FALSE)
+```
+
+### Using FPKM normed genes
+
+```{r echo=FALSE, fig.width = 8, fig.height = 3}
+compare_hla(ls_preprocessed, mat_name='fpkm_all', hla_ids, hla_gsym, BPplot = T)
+compare_hla(ls_preprocessed, mat_name='fpkm_all', rownames(de_hla), de_hla$gene,  BPplot = FALSE)
+```
+
+# Transcription Factor activiy (VIPER)
+
+```{r}
+library(viper)
+dorothea2viper_regulons <- function(df) {
+  regulon_list <- split(df, df$tf)
+  viper_regulons <- lapply(regulon_list, function(regulon) {
+    tfmode <- stats::setNames(regulon$mor, regulon$target)
+    list(tfmode = tfmode, likelihood = rep(1, length(tfmode)))
+  })
+  return(viper_regulons)
+}
+
+
+result <- WGCNA::collapseRows(ls_preprocessed$vsd_mat,
+                          rowGroup=ls_preprocessed$rna_all$Feature_gene_name,
+                          rowID=rownames(ls_preprocessed$vsd_mat),
+                          method="MaxMean")
+
+data <- data.frame(result$datETcollapsed)
+
+regulons = dorothea::dorothea_hs %>%
+  filter(confidence %in% c("A", "B"))
+
+regu <- dorothea2viper_regulons(regulons)
+vpres_25 <- t(viper(data, regu, verbose = FALSE, minsize = 25))
+rownames(vpres_25) <- ls_preprocessed$p_all$pt_ID
+
+vpres_4 <- t(viper(data, regu, verbose = FALSE, minsize = 4))
+rownames(vpres_4) <- ls_preprocessed$p_all$pt_ID
+
+```
+
+## Comparing two groups with msVIPER
+
+```{r}
+ind_i <- which(ls_preprocessed$pData_rnaseq$n_op2 == 'ind')
+agg_i <- which(ls_preprocessed$pData_rnaseq$n_op2 == 'agg')
+
+mat_ind <- as.matrix(data[,ind_i])
+mat_agg <- as.matrix(data[,agg_i])
+```
+
+### Generating NULL model
+
+```{r}
+dnull <- ttestNull(mat_agg, mat_ind, per=1000)
+```
+
+### Generating signature
+
+```{r}
+signature <- rowTtest(mat_agg, mat_ind)
+signature <- (qnorm(signature$p.value/2, lower.tail = FALSE) * sign(signature$statistic))[, 1]
+```
+
+### Running msVIPER
+
+```{r}
+mrs <- msviper(signature, regu, dnull, verbose = FALSE)
+```
+
+```{r}
+knitr::kable(summary(mrs))
+plot(mrs, cex = .7)
+```
+
+### Leading-edge analysis
+
+To identify the genes driving the enrichment of a gene-set on a GES based on Gene Set Enrichment Analysis (GSEA).
+
+```{r}
+mrs <- ledge(mrs)
+knitr::kable(summary(mrs))
+```
+
+### Shadow analysis
+
+```{r}
+mrshadow <- shadow(mrs, regulators = 25, verbose = FALSE)
+knitr::kable(summary(mrshadow))
+```
+
+### Synergy analysis
+
+```{r}
+mrs <- msviperCombinatorial(mrs, regulators = 25, verbose = FALSE)
+mrs <- msviperSynergy(mrs, verbose = FALSE)
+```
+
+```{r}
+knitr::kable(summary(mrs))
+plot(mrs)
+```
+
+# Deconvolution
+
+```{r}
+mcp_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/MCP/mcp_fpkm_dcv.txt", row.names=1)))
+qts_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/QTS/qts_fpkm_dcv.txt", row.names=1)))
+cbs_dcv <- read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/CBS/CIBERSORT.rna_only_fpkm.txt", row.names=1)
+xcell_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/XCELL/xCell_rnaseq_fpkm_xCell_1132060320.txt", row.names=1)))
+
+```
+
+## XCell
+
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(xcell_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(xcell_dcv, pData_rnaseq, 'n_op2')
+```
+
+## CIBERSORT
+
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(cbs_dcv[,1:22], pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(cbs_dcv[,1:22], pData_rnaseq, 'n_op2')
+```
+
+## quanTIseq
+
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(qts_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(data.frame(qts_dcv), pData_rnaseq, 'n_op2')
+```
+
+## MCP counter
+
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(mcp_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(data.frame(mcp_dcv), pData_rnaseq, 'n_op2')
+```
