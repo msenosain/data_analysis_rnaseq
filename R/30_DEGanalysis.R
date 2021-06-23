@@ -333,7 +333,7 @@ kegg_go <- function(DE_res, kegg = TRUE, GO = FALSE){
 
     # running the KEGG pathway analysis
     if(kegg){
-        keggres = gage(fc, gsets=kegg.sets.hs, same.dir=FALSE)
+        keggres <- gage(fc, gsets=kegg.sets.hs, same.dir=FALSE)
         keggres <- ls2df(keggres)
         return(keggres)
     }
