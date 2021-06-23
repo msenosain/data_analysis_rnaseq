@@ -134,7 +134,7 @@ When sample is Aggressive ('agg'), pathways shown below are up- or down- regulat
 >
 > -   NES -- enrichment score normalized to mean enrichment of random samples of the same size; • size -- size of the pathway after removing genes not present in 'names(stats)'.
 >
-> -   leadingEdge -- vector with indexes of leading edge genes that drive the enrichment, see http://software.broadinstitute.org/gsea/doc/GSEAUserGuideTEXT.htm\#\_Running_a\_Leading.
+> -   leadingEdge -- vector with indexes of leading edge genes that drive the enrichment, see [http://software.broadinstitute.org/gsea/doc/GSEAUserGuideTEXT.htm\\\#\\\_Running_a\\\_Leading](http://software.broadinstitute.org/gsea/doc/GSEAUserGuideTEXT.htm#_Running_a_Leading){.uri}.
 
 ```{r echo=FALSE}
 fgsea_res <- fgsea_analysis(DE_res)
