@@ -498,6 +498,20 @@ qts_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/decon
 cbs_dcv <- read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/CBS/CIBERSORT.rna_only_fpkm.txt", row.names=1)
 xcell_dcv <- data.frame(t(read.delim("~/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/XCELL/xCell_rnaseq_fpkm_xCell_1132060320.txt", row.names=1)))
 
+# From Pancaldi lab signatures
+main_path = '/Users/senosam/Documents/Massion_lab/RNASeq_summary/deconvolution/output/rna_only/Pancaldi'
+Epidish_BPRNACan_dcv <- read.delim(file.path(main_path,"Epidish_BPRNACan_dcv.txt"), 
+                                   row.names=1)
+DeconRNASeq_BPRNACan_dcv <- read.delim(file.path(main_path,"DeconRNASeq_BPRNACan_dcv.txt"), 
+                                       row.names=1)
+Epidish_BPRNACan3DProMet_dcv <- read.delim(file.path(main_path,"Epidish_BPRNACan3DProMet_dcv.txt"), 
+                                           row.names=1)
+DeconRNASeq_BPRNACan3DProMet_dcv <- read.delim(file.path(main_path,"DeconRNASeq_BPRNACan3DProMet_dcv.txt"), 
+                                               row.names=1)
+Epidish_BPRNACanProMet_dcv <- read.delim(file.path(main_path,"Epidish_BPRNACanProMet_dcv.txt"), 
+                                         row.names=1)
+DeconRNASeq_BPRNACanProMet_dcv <- read.delim(file.path(main_path,"DeconRNASeq_BPRNACanProMet_dcv.txt"), 
+                                             row.names=1)
 ```
 
 ## XCell
@@ -538,4 +552,64 @@ frac_hm(mcp_dcv, pData_rnaseq, 'n_op2')
 
 ```{r  , fig.width = 20, fig.height = 15}
 frac_boxplot(data.frame(mcp_dcv), pData_rnaseq, 'n_op2')
+```
+
+## Epidish_BPRNACan
+
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(Epidish_BPRNACan_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(data.frame(Epidish_BPRNACan_dcv), pData_rnaseq, 'n_op2')
+```
+
+## DeconRNASeq_BPRNACan
+
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(DeconRNASeq_BPRNACan_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(data.frame(DeconRNASeq_BPRNACan_dcv), pData_rnaseq, 'n_op2')
+```
+
+## Epidish_BPRNACan3DProMet
+
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(Epidish_BPRNACan3DProMet_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(data.frame(Epidish_BPRNACan3DProMet_dcv), pData_rnaseq, 'n_op2')
+```
+
+## DeconRNASeq_BPRNACan3DProMet
+
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(DeconRNASeq_BPRNACan3DProMet_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(data.frame(DeconRNASeq_BPRNACan3DProMet_dcv), pData_rnaseq, 'n_op2')
+```
+
+## Epidish_BPRNACanProMet
+
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(Epidish_BPRNACanProMet_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(data.frame(Epidish_BPRNACanProMet_dcv), pData_rnaseq, 'n_op2')
+```
+
+## DeconRNASeq_BPRNACanProMet
+
+```{r  , fig.width = 10, fig.height = 8}
+frac_hm(DeconRNASeq_BPRNACanProMet_dcv, pData_rnaseq, 'n_op2')
+```
+
+```{r  , fig.width = 20, fig.height = 15}
+frac_boxplot(data.frame(DeconRNASeq_BPRNACanProMet_dcv), pData_rnaseq, 'n_op2')
 ```
