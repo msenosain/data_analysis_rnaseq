@@ -20,18 +20,16 @@ load("/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData")
 environment_set()
 ```
 
-# Pre-processing of the data
 
 ```{r}
+# Preprocessing data
 ls_preprocessed <- preprocess_rna(path_rnaseq = '/Users/senosam/Documents/Massion_lab/RNASeq_summary/rnaseq.RData', 
                                   correct_batch = F, lowvargenesrm = T, prot_coding_only = F, xychr_rm = T)
 
 CDE <- read.csv(file = '/Users/senosam/Documents/Massion_lab/CyTOF_summary/CDE_TMA36_2021JAN13_SA_MF.csv')
 pData_rnaseq <- CDE[match(ls_preprocessed$pData_rnaseq$pt_ID, CDE$pt_ID),]
 ls_preprocessed$pData_rnaseq <- pData_rnaseq
-```
 
-```{r}
 # adding FPKM
 rownames(fpkm_all) <- fpkm_all$Feature
 fpkm_all <- fpkm_all[match(ls_preprocessed$rna_all$Feature, rownames(fpkm_all)),]
@@ -45,16 +43,8 @@ tpm_all <- tpm_all[,ls_preprocessed$p_all$Vantage_ID]
 ls_preprocessed$tpm_all <- tpm_all
 ```
 
-# Exploring data
-
-## Batch effect
-
-```{r echo=FALSE}
-print(ls_preprocessed$pbatch_bf)
-#print(ls_preprocessed$pbatch_af)
-```
-
-# Differential gene expression analysis
+# Indolent vs Aggressive
+## Differential gene expression analysis
 
 ```{r echo=FALSE}
 DE_res <- DE_analysis(ls_preprocessed, 
@@ -66,8 +56,6 @@ DE_res <- DE_analysis(ls_preprocessed,
            reference = 'ind')
 
 ```
-
-## DE results
 
 ### Top DE genes: Heatmap
 
